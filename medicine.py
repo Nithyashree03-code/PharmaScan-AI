@@ -266,9 +266,101 @@ DEFAULTS = {
     "otp_pending_user":  "",
     "otp_pending_pass":  "",
 }
+# ─────────────────────────────────────────────────────────────────
+# SESSION STATE
+# ─────────────────────────────────────────────────────────────────
+DEFAULTS = {
+    "logged_in":        False,
+    "user_role":        "",   # "user", "expert", or "admin"
+    "username":         "",
+    "user_email":       "",   # login Gmail → used as alert receiver
+    "dark_mode":        True,
+    "chat_messages":    [],
+    "scan_result":      None,
+    "current_medicine": None,
+    "ocr_text":         "",
+    "alert_sent":       False,
+    "login_error":      "",
+    "reg_error":        "",
+    "reg_ok":           False,
+    "alert_err":        "",
+    "cam_result":       None,
+    "cam_bytes":        None,
+    "cam_arr":          None,
+    "pharmacy_map":     None,
+    "pharmacy_count":   0,
+    "hotspot_prediction": None,
+    "upload_img_arr":    None,
+    "confirm_delete":    False,
+    "otp_code":          "",
+    "otp_email":         "",
+    "otp_verified":      False,
+    "otp_sent":          False,
+    "otp_pending_user":  "",
+    "otp_pending_pass":  "",
+}
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+# ─────────────────────────────────────────────────────────────────
+# PERSISTENT LOGIN — survives page refresh using a session file
+# ─────────────────────────────────────────────────────────────────
+SESSION_FILE = _os.path.join(DATA_DIR, "active_session.json")
+
+def _save_session(username, role, email):
+    """Save login info to disk so refresh restores the session."""
+    try:
+        with open(SESSION_FILE, "w") as f:
+            json.dump({
+                "username": username,
+                "user_role": role,
+                "user_email": email,
+                "dark_mode": st.session_state.get("dark_mode", True),
+            }, f)
+    except Exception:
+        pass
+
+def _clear_session():
+    """Delete the saved session file on logout."""
+    try:
+        if _os.path.exists(SESSION_FILE):
+            _os.remove(SESSION_FILE)
+    except Exception:
+        pass
+
+def _restore_session():
+    """On app start, restore login from disk if file exists."""
+    try:
+        if _os.path.exists(SESSION_FILE) and not st.session_state.logged_in:
+            with open(SESSION_FILE, "r") as f:
+                data = json.load(f)
+            uname = data.get("username", "")
+            role  = data.get("user_role", "")
+            email = data.get("user_email", "")
+            # Verify user still exists in DB (not deleted)
+            if uname:
+                conn = sqlite3.connect(DB_PATH)
+                row  = conn.execute(
+                    "SELECT username FROM users WHERE username=?", (uname,)
+                ).fetchone()
+                conn.close()
+                # Allow admin restore too
+                is_admin = (uname.strip().lower() == ADMIN_USERNAME.lower())
+                if row or is_admin:
+                    st.session_state.logged_in  = True
+                    st.session_state.username   = uname
+                    st.session_state.user_role  = role
+                    st.session_state.user_email = email
+                    st.session_state.dark_mode  = data.get("dark_mode", True)
+                else:
+                    _clear_session()
+    except Exception:
+        pass
+
+# Restore session on every page load
+_restore_session()
+
 
 # ─────────────────────────────────────────────────────────────────
 # DATABASE
@@ -1764,47 +1856,22 @@ body, .stMarkdown, .stText, p, span, div, label, button,
 [data-testid="stSidebar"] {{ font-family:'DM Sans',sans-serif !important; }}
 h1,h2,h3 {{ font-family:'Syne',sans-serif !important; }}
 
-/* ── Hide sidebar toggle text, keep only the ☰ icon ── */
-button[data-testid="stSidebarNavToggleButton"] span,
-button[data-testid="stSidebarCollapsedControl"] span,
-[data-testid="stSidebarCollapsedControl"] span,
-[data-testid="collapsedControl"] span {{ display: none !important; }}
-
-button[data-testid="stSidebarNavToggleButton"],
-button[data-testid="stSidebarCollapsedControl"],
-[data-testid="stSidebarCollapsedControl"],
-[data-testid="collapsedControl"] {{
-  font-size: 0 !important;
-  color: transparent !important;
-  background: rgba(99,102,241,0.15) !important;
-  border: 1px solid rgba(99,102,241,0.35) !important;
-  border-radius: 8px !important;
-  width: 36px !important; height: 36px !important;
-  display: flex !important; align-items: center !important; justify-content: center !important;
+/* ── HIDE STREAMLIT HEADER COMPLETELY (removes keyb text + double icons) ── */
+header[data-testid="stHeader"] {{
+  background: transparent !important;
+  border-bottom: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
 }}
-button[data-testid="stSidebarNavToggleButton"]::before,
-button[data-testid="stSidebarCollapsedControl"]::before,
-[data-testid="stSidebarCollapsedControl"]::before,
-[data-testid="collapsedControl"]::before {{
-  content: "☰" !important;
-  font-size: 1.1rem !important;
-  color: #a78bfa !important;
-  display: block !important;
+/* Hide all header children EXCEPT the sidebar toggle */
+header[data-testid="stHeader"] > div {{
+  display: none !important;
 }}
-
-/* Also hide any header label text that says keyboard_double */
-header[data-testid="stHeader"] button span,
-header[data-testid="stHeader"] button p {{ display: none !important; }}
-header[data-testid="stHeader"] button {{
-  font-size: 0 !important;
-  color: transparent !important;
-}}
-header[data-testid="stHeader"] button::before {{
-  content: "☰" !important;
-  font-size: 1.1rem !important;
-  color: #a78bfa !important;
-  display: block !important;
-}}
+[data-testid="stDecoration"] {{ display: none !important; }}
+/* Push content up since header is gone */
+.block-container {{ padding-top: 0.5rem !important; }}
 
 /* ── Prevent ALL overflow / collision ── */
 * {{ box-sizing:border-box !important; }}
@@ -1866,6 +1933,19 @@ section[data-testid="stSidebar"] .stButton>button {{
   white-space:nowrap !important;
   overflow:hidden !important;
   text-overflow:ellipsis !important;
+}}
+
+/* ── Mobile: sidebar as overlay, not content pusher ── */
+@media (max-width: 768px) {{
+  section[data-testid="stSidebar"] {{
+    position: fixed !important;
+    top: 0 !important; left: 0 !important;
+    height: 100vh !important;
+    z-index: 999 !important;
+    width: 80vw !important;
+    max-width: 300px !important;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.6) !important;
+  }}
 }}
 
 /* ── App cards / components ── */
@@ -1985,7 +2065,25 @@ summary {{ color:{TXT} !important; font-weight:600; padding:0.5rem 0.8rem; font-
 .sp-fix {{ color:#86efac !important; font-weight:600; font-size:0.8rem; }}
 .footer {{ text-align:center; padding:2.2rem; margin-top:2rem; background:{'linear-gradient(135deg,#0d1b2a,#1b2a4a)' if DK else 'linear-gradient(135deg,#eef2ff,#f5f0ff)'}; border-radius:24px; border:1px solid {BDR}; }}
 
-/* ══ MOBILE RESPONSIVE ══════════════════════════════════════════ */
+/* ── Top navbar action buttons (☰ 👤 🌙) ── */
+.topbar-btns-row div[data-testid="stHorizontalBlock"] {{ gap:6px!important; margin-bottom:8px!important; }}
+/* Make the 3 icon buttons small and pill-shaped */
+div[data-testid="stHorizontalBlock"]:first-of-type .stButton>button {{
+  background:rgba(99,102,241,0.12) !important;
+  border:1px solid rgba(99,102,241,0.3) !important;
+  border-radius:10px !important;
+  font-size:1rem !important;
+  padding:0.25rem 0.5rem !important;
+  box-shadow:none !important;
+  color:#a78bfa !important;
+  min-height:36px !important;
+  width:auto !important;
+}}
+div[data-testid="stHorizontalBlock"]:first-of-type .stButton>button:hover {{
+  background:rgba(99,102,241,0.25) !important;
+  transform:none !important;
+  box-shadow:none !important;
+}}
 @media (max-width: 768px) {{
   .block-container {{ padding: 0.4rem 0.5rem 1rem !important; max-width: 100% !important; }}
 
@@ -2167,20 +2265,27 @@ header[data-testid="stHeader"]{display:none!important}
 /* ── fp panel ── */
 .ps-fp{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.4);
   border-radius:16px;padding:16px;margin-bottom:8px}
-/* MOBILE — shrink outer spacer columns, expand center card */
+/* MOBILE */
 @media(max-width:768px){
+  /* Collapse outer spacer cols to zero */
   .login-outer-col{flex:0 0 2px!important;min-width:2px!important;max-width:2px!important;overflow:hidden!important;padding:0!important;visibility:hidden!important}
-  .login-center-col{flex:1 1 auto!important;min-width:0!important;max-width:100%!important}
-  .ps-card{padding:18px 16px 14px;border-radius:18px}
-  .ps-brand{font-size:1.25rem}
-  .ps-shield{width:42px;height:42px;font-size:1.1rem}
-  .stTabs [data-baseweb="tab"]{font-size:.76rem!important;padding:5px 10px!important}
+  .login-center-col{flex:1 1 auto!important;min-width:0!important;max-width:100%!important;padding:0 8px!important}
+  /* Card itself */
+  .ps-card{padding:20px 16px 16px!important;border-radius:20px!important}
+  .ps-brand{font-size:1.2rem!important}
+  .ps-shield{width:40px!important;height:40px!important;font-size:1.1rem!important}
+  /* Make login/register buttons normal width not full-width */
+  .stButton>button{width:auto!important;min-width:120px!important}
+  .stTabs [data-baseweb="tab"]{font-size:.78rem!important;padding:6px 12px!important}
+  /* Hide Streamlit's deploy/github buttons in header */
+  header[data-testid="stHeader"] a,
+  header[data-testid="stHeader"] [data-testid="stDecoration"]{ display:none!important }
 }
 @media(max-width:480px){
-  .ps-card{padding:14px 12px 12px;border-radius:16px}
-  .ps-brand{font-size:1.1rem}
-  .ps-shield{width:38px;height:38px;font-size:1rem}
-  .stTabs [data-baseweb="tab"]{font-size:.72rem!important;padding:4px 8px!important}
+  .ps-card{padding:16px 12px 14px!important;border-radius:16px!important}
+  .ps-brand{font-size:1.05rem!important}
+  .ps-shield{width:36px!important;height:36px!important;font-size:1rem!important}
+  .stTabs [data-baseweb="tab"]{font-size:.72rem!important;padding:5px 9px!important}
 }
 </style>
 <div class="ps-bg">
@@ -2190,7 +2295,6 @@ header[data-testid="stHeader"]{display:none!important}
 </div>
 <div class="ps-beam"></div>
 <script>
-// Label the login columns so CSS can target them reliably
 (function labelLoginCols(){
   function run(){
     var blocks = document.querySelectorAll('[data-testid="stHorizontalBlock"]');
@@ -2203,10 +2307,10 @@ header[data-testid="stHeader"]{display:none!important}
       }
     });
   }
-  // Run immediately and again after Streamlit hydrates
   run();
   setTimeout(run, 300);
   setTimeout(run, 800);
+  setTimeout(run, 1500);
 })();
 </script>
 """, unsafe_allow_html=True)
@@ -2329,10 +2433,12 @@ header[data-testid="stHeader"]{display:none!important}
                         final_role = urole or "user"
                         if sel == "expert" and final_role != "expert":
                             final_role = "expert"
+                        final_email = le if le else (uemail or f"{uname}@pharmascan.demo")
                         st.session_state.update({
                             "logged_in":True,"username":uname,
-                            "user_email": le if le else (uemail or f"{uname}@pharmascan.demo"),
+                            "user_email": final_email,
                             "user_role":final_role,"login_error":"","login_role_sel":""})
+                        _save_session(uname, final_role, final_email)
                         st.rerun()
                     else:
                         st.session_state.login_error="Wrong username or password.  Demo: admin / pharmascan123"
@@ -2489,6 +2595,7 @@ Required to register as Doctor / Pharmacist. Stored securely and never shared.</
                                     "logged_in":True,"username":st.session_state.otp_pending_user,
                                     "user_email":st.session_state.otp_email,"user_role":rr,
                                     "otp_sent":False,"otp_code":"","otp_verified":True,"reg_error":""})
+                                _save_session(st.session_state.otp_pending_user, rr, st.session_state.otp_email)
                                 st.rerun()
                             else:
                                 st.session_state.update({"reg_error":msg,"reg_ok":False}); st.rerun()
@@ -2590,7 +2697,7 @@ def show_profile_page():
     if not df_prof.empty and "medicine" in df_prof.columns:
         recent_meds = df_prof["medicine"].dropna().head(5).tolist()
 
-    _, col, _ = st.columns([1, 3.5, 1])
+    _, col, _ = st.columns([0.5, 4, 0.5])
     with col:
         # Back button
         st.markdown('<div class="back-btn">', unsafe_allow_html=True)
@@ -2690,6 +2797,7 @@ def show_profile_page():
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown('<div class="logout-btn">', unsafe_allow_html=True)
         if st.button("🚪 Logout", key="btn_prof_logout", use_container_width=True):
+            _clear_session()
             for k in list(DEFAULTS.keys()):
                 st.session_state[k] = DEFAULTS[k]
             st.rerun()
@@ -2740,6 +2848,7 @@ def show_profile_page():
                     # Sync CSV after deletion
                     _csv_append_login(username, "", "", "ACCOUNT_DELETED")
                     _csv_sync_from_db()
+                    _clear_session()
                     for k in list(DEFAULTS.keys()):
                         st.session_state[k] = DEFAULTS[k]
                     st.session_state["confirm_delete"] = False
@@ -2767,14 +2876,21 @@ def show_app():
 
     # If profile page requested, show it full-screen instead of app
     if st.session_state.get("show_profile"):
+        # Hide sidebar on profile page
+        st.markdown("""<style>
+section[data-testid="stSidebar"]{display:none!important}
+.block-container{max-width:600px!important;margin:0 auto!important;padding:1rem 1rem!important}
+</style>""", unsafe_allow_html=True)
         show_profile_page()
         return
 
     with st.sidebar:
         # ── Header row ─────────────────────────────────────────────
         st.markdown(
-            f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
-            f'<div style="font-size:.95rem;font-weight:800;color:#a78bfa;font-family:Syne,sans-serif;white-space:nowrap">🛡️ PharmaScan</div>' +
+            f'<div style="display:flex;align-items:center;justify-content:space-between;'
+            f'margin-bottom:4px;padding:4px 0">'
+            f'<div style="font-size:.95rem;font-weight:800;color:#a78bfa;'
+            f'font-family:Syne,sans-serif;white-space:nowrap">🛡️ PharmaScan</div>'
             f'</div>',
             unsafe_allow_html=True)
 
@@ -2783,10 +2899,13 @@ def show_app():
             st.markdown(f'<div style="color:{MUT};font-size:.75rem;padding-top:6px">👤 {username}</div>', unsafe_allow_html=True)
         with sb2:
             if st.button("🌙" if DK else "☀️", key="btn_theme", use_container_width=True):
-                st.session_state.dark_mode = not DK; st.rerun()
+                st.session_state.dark_mode = not DK
+                _save_session(username, user_role, user_email)
+                st.rerun()
         with sb3:
-            if st.button("👤", key="btn_profile", use_container_width=True):
-                st.session_state["show_profile"] = True; st.rerun()
+            if st.button("👤 Me", key="btn_profile", use_container_width=True):
+                st.session_state["show_profile"] = True
+                st.rerun()
 
         st.markdown("---")
 
@@ -2843,9 +2962,114 @@ def show_app():
 
         st.markdown("---")
         if st.button("🚪 Logout", key="btn_logout_main", use_container_width=True):
+            _clear_session()
             for k in list(DEFAULTS.keys()):
                 st.session_state[k] = DEFAULTS[k]
             st.rerun()
+
+    # ── TOP NAVBAR — HTML wrapper with Streamlit buttons inside ──
+    st.markdown(f"""<style>
+/* Sidebar toggle */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarNavToggleButton"] {{
+  position:fixed!important; top:10px!important; left:10px!important;
+  z-index:9999!important; width:40px!important; height:40px!important;
+  background:rgba(99,102,241,0.2)!important;
+  border:1.5px solid rgba(99,102,241,0.45)!important;
+  border-radius:10px!important; overflow:hidden!important;
+}}
+[data-testid="stSidebarCollapsedControl"]*,
+[data-testid="stSidebarNavToggleButton"]* {{
+  color:transparent!important; font-size:0!important;
+}}
+[data-testid="stSidebarCollapsedControl"]::after,
+[data-testid="stSidebarNavToggleButton"]::after {{
+  content:"☰"!important; font-size:1.2rem!important;
+  color:#a78bfa!important; position:absolute!important;
+  pointer-events:none!important;
+}}
+/* Navbar: style the columns block */
+div.nav-row [data-testid="stHorizontalBlock"] {{
+  background:rgba(15,23,42,0.88)!important;
+  border:1px solid rgba(99,102,241,0.2)!important;
+  border-radius:14px!important;
+  padding:4px 10px 4px 54px!important;
+  margin-bottom:14px!important;
+  gap:0px!important;
+  align-items:center!important;
+}}
+/* All columns equal minimal padding */
+div.nav-row [data-testid="column"] {{
+  padding:0 3px!important;
+  min-width:0!important;
+}}
+/* Nav buttons */
+div.nav-row .stButton>button {{
+  background:rgba(99,102,241,0.14)!important;
+  border:1px solid rgba(99,102,241,0.3)!important;
+  border-radius:20px!important;
+  color:#c4b5fd!important;
+  font-size:0.73rem!important;
+  font-weight:600!important;
+  padding:3px 10px!important;
+  box-shadow:none!important;
+  min-height:26px!important;
+  height:26px!important;
+  line-height:1!important;
+  transform:none!important;
+  white-space:nowrap!important;
+  width:100%!important;
+}}
+div.nav-row .stButton>button:hover {{
+  background:rgba(99,102,241,0.28)!important;
+  transform:none!important; box-shadow:none!important;
+}}
+/* Logout red */
+div.nav-row [data-testid="column"]:last-child .stButton>button {{
+  background:rgba(239,68,68,0.12)!important;
+  border-color:rgba(239,68,68,0.28)!important;
+  color:#fca5a5!important;
+}}
+</style>""", unsafe_allow_html=True)
+
+    st.markdown('<div class="nav-row">', unsafe_allow_html=True)
+    nb_brand, nb1, nb2, nb3 = st.columns([5.5, 1.3, 0.6, 1.2])
+    with nb_brand:
+        st.markdown(f'<p style="color:#a78bfa;font-family:Syne,sans-serif;font-weight:800;font-size:.92rem;margin:0;padding-top:3px;white-space:nowrap">🛡️ PharmaScan AI &nbsp;<span style="color:#475569;font-size:.72rem;font-weight:400">· 👤 {username}</span></p>', unsafe_allow_html=True)
+    with nb1:
+        if st.button("👤 Profile", key="btn_top_profile", use_container_width=True):
+            st.session_state["show_profile"] = True
+            st.rerun()
+    with nb2:
+        if st.button("🌙" if DK else "☀️", key="btn_top_theme", use_container_width=True):
+            st.session_state.dark_mode = not DK
+            _save_session(username, user_role, user_email)
+            st.rerun()
+    with nb3:
+        if st.button("🚪 Logout", key="btn_top_logout", use_container_width=True):
+            _clear_session()
+            for k in list(DEFAULTS.keys()):
+                st.session_state[k] = DEFAULTS[k]
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Handle navbar actions via query params (no visible ghost buttons) ──
+    qp = st.query_params
+    if qp.get("nav") == "profile":
+        st.query_params.clear()
+        st.session_state["show_profile"] = True
+        st.rerun()
+    elif qp.get("nav") == "theme":
+        st.query_params.clear()
+        st.session_state.dark_mode = not DK
+        _save_session(username, user_role, user_email)
+        st.rerun()
+    elif qp.get("nav") == "logout":
+        st.query_params.clear()
+        _clear_session()
+        for k in list(DEFAULTS.keys()):
+            st.session_state[k] = DEFAULTS[k]
+        st.rerun()
 
     # ── HERO ─────────────────────────────────────────────────────
     df_c = db_get_scans(username)
@@ -3863,7 +4087,7 @@ def show_app():
         # ── USER: Heatmap ─────────────────────────────────────────
         HT1, HT2, HT3 = st.tabs(["🗺️ Fake Heatmap","🏥 Pharmacy Finder","🔮 Hotspot Predictor"])
         with HT1:
-            st.markdown(f'<p style="color:{TXT};font-size:1.05rem;font-weight:700">Nationwide Fake Medicine Heatmap</p>', unsafe_allow_html=True)
+            st.markdown(f'<p style="color:{TXT};font-size:1.05rem;font-weight:700">🗺️ Nationwide Fake Medicine Heatmap</p>', unsafe_allow_html=True)
             df_hm = db_get_scans()
             if df_hm.empty or "lat" not in df_hm.columns or (df_hm["lat"]==0).all():
                 st.markdown('<div class="rc rc-info" style="padding:.8rem 1rem;font-size:.84rem">Showing demo data — real scan locations will appear here</div>', unsafe_allow_html=True)
@@ -3874,11 +4098,42 @@ def show_app():
                     fake_hm = row_hm.get("authentic",1)==0
                     popup_hm = f"<b style='color:{'#ef4444' if fake_hm else '#10b981'}'>{'FAKE' if fake_hm else 'GENUINE'}</b><br>{str(row_hm.get('medicine','?'))}<br>{row_hm.get('city','?')}"
                     folium.Marker([float(row_hm["lat"]),float(row_hm["lon"])],popup=folium.Popup(popup_hm,max_width=200),icon=folium.Icon(color="red" if fake_hm else "green",icon="exclamation-sign" if fake_hm else "ok",prefix="glyphicon")).add_to(mh)
-            st_folium(mh, height=480, use_container_width=True, key="heatmap", returned_objects=[])
+            # Full height map
+            st.markdown('<style>iframe{min-height:500px!important;height:60vh!important;}</style>', unsafe_allow_html=True)
+            st_folium(mh, height=600, use_container_width=True, key="heatmap", returned_objects=[])
+
         with HT2:
-            st.markdown(f'<p style="color:{TXT};font-size:1.05rem;font-weight:700">Find Nearby Pharmacies</p>', unsafe_allow_html=True)
-            if st.button("📍 Load Pharmacies", use_container_width=True):
-                with st.spinner("Loading map..."):
+            st.markdown(f'<p style="color:{TXT};font-size:1.05rem;font-weight:700">📍 Find Nearby Pharmacies</p>', unsafe_allow_html=True)
+
+            # ── Location setter directly in this tab ──────────────────
+            st.markdown(f'<div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);border-radius:14px;padding:14px 16px;margin-bottom:12px">'
+                        f'<p style="color:#a5b4fc;font-size:.82rem;font-weight:700;margin-bottom:10px">📍 Set Your Location</p>',
+                        unsafe_allow_html=True)
+            loc_col1, loc_col2 = st.columns(2)
+            with loc_col1:
+                user_lat = st.number_input("Latitude", value=user_lat, format="%.4f", key="map_lat")
+            with loc_col2:
+                user_lon = st.number_input("Longitude", value=user_lon, format="%.4f", key="map_lon")
+            user_city = st.text_input("City name", value=user_city, key="map_city")
+            st.markdown(
+                '<p style="color:#64748b;font-size:.74rem;margin-top:4px">💡 Tip: Google your city name + "coordinates" to find your lat/lon</p>'
+                '</div>', unsafe_allow_html=True)
+
+            # Common Indian cities quick-select
+            st.markdown(f'<p style="color:{MUT};font-size:.78rem;font-weight:700;margin-bottom:6px">🏙️ Quick select city:</p>', unsafe_allow_html=True)
+            cities = {"Chennai":(13.0827,80.2707),"Mumbai":(19.0760,72.8777),"Delhi":(28.6139,77.2090),
+                      "Bengaluru":(12.9716,77.5946),"Hyderabad":(17.3850,78.4867),
+                      "Kolkata":(22.5726,88.3639),"Pune":(18.5204,73.8567),"Ahmedabad":(23.0225,72.5714)}
+            city_cols = st.columns(4)
+            for i,(cname,(clat,clon)) in enumerate(cities.items()):
+                with city_cols[i%4]:
+                    if st.button(cname, key=f"city_{cname}", use_container_width=True):
+                        user_lat = clat; user_lon = clon; user_city = cname
+                        st.rerun()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("📍 Find Pharmacies Near Me", use_container_width=True, key="btn_find_pharm"):
+                with st.spinner("Searching pharmacies..."):
                     pm = folium.Map(location=[user_lat,user_lon],zoom_start=14,tiles="cartodbdark_matter")
                     ph_count=0
                     try:
@@ -3889,12 +4144,15 @@ def show_app():
                         for p_ov in ph_ov:
                             folium.Marker([p_ov["lat"],p_ov["lon"]],popup=p_ov.get("tags",{}).get("name","Pharmacy"),icon=folium.Icon(color="red",icon="plus-sign")).add_to(pm)
                     except Exception: pass
-                    folium.Marker([user_lat,user_lon],popup="You",icon=folium.Icon(color="blue",icon="home")).add_to(pm)
+                    folium.Marker([user_lat,user_lon],popup=f"📍 You ({user_city})",icon=folium.Icon(color="blue",icon="home")).add_to(pm)
                     st.session_state.pharmacy_map=pm; st.session_state.pharmacy_count=ph_count
             if st.session_state.get("pharmacy_map") is not None:
                 n_ph=st.session_state.pharmacy_count
-                if n_ph>0: st.success(f"Found {n_ph} pharmacies nearby")
-                st_folium(st.session_state.pharmacy_map, height=420, use_container_width=True, key="pharmacy_map", returned_objects=[])
+                if n_ph>0:
+                    st.success(f"✅ Found {n_ph} pharmacies within 2km of {user_city}")
+                else:
+                    st.info("No pharmacies found nearby — try a different location")
+                st_folium(st.session_state.pharmacy_map, height=500, use_container_width=True, key="pharmacy_map", returned_objects=[])
         with HT3:
             st.markdown(f'<p style="color:{TXT};font-size:1.05rem;font-weight:700">🔮 AI Hotspot Predictor</p>', unsafe_allow_html=True)
             st.markdown('<div class="rc rc-info" style="padding:.8rem 1rem;font-size:.84rem">📊 Statistical analysis of your scan data to predict the highest-risk zones</div>', unsafe_allow_html=True)
@@ -4203,6 +4461,7 @@ def show_admin_dashboard():
     col_lo, _ = st.columns([1, 5])
     with col_lo:
         if st.button("🚪 Logout", key="admin_logout", use_container_width=True):
+            _clear_session()
             for k in list(DEFAULTS.keys()):
                 st.session_state[k] = DEFAULTS[k]
             st.rerun()
