@@ -2147,12 +2147,27 @@ header[data-testid="stHeader"]{display:none!important}
 /* ── fp panel ── */
 .ps-fp{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.4);
   border-radius:16px;padding:16px;margin-bottom:8px}
-/* MOBILE */
-@media(max-width:480px){
+/* MOBILE — wrap the login content in a centered max-width box */
+@media(max-width:768px){
+  /* Shrink the outer spacer columns to near-zero so center col fills screen */
+  [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
+  [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child{
+    flex:0 0 4px!important;min-width:4px!important;max-width:4px!important;
+    overflow:hidden!important;padding:0!important;
+  }
+  [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2){
+    flex:1 1 auto!important;min-width:0!important;max-width:100%!important;
+  }
   .ps-card{padding:18px 16px 14px;border-radius:18px}
-  .ps-brand{font-size:1.2rem}
-  .ps-shield{width:40px;height:40px;font-size:1.1rem}
+  .ps-brand{font-size:1.25rem}
+  .ps-shield{width:42px;height:42px;font-size:1.1rem}
   .stTabs [data-baseweb="tab"]{font-size:.76rem!important;padding:5px 10px!important}
+}
+@media(max-width:480px){
+  .ps-card{padding:14px 12px 12px;border-radius:16px}
+  .ps-brand{font-size:1.1rem}
+  .ps-shield{width:38px;height:38px;font-size:1rem}
+  .stTabs [data-baseweb="tab"]{font-size:.72rem!important;padding:4px 8px!important}
 }
 </style>
 <div class="ps-bg">
@@ -2163,9 +2178,8 @@ header[data-testid="stHeader"]{display:none!important}
 <div class="ps-beam"></div>
 """, unsafe_allow_html=True)
 
-    # ── centred card — works on all screen sizes ───────────────────
-    st.markdown('<div style="max-width:440px;margin:0 auto;padding:0 8px">', unsafe_allow_html=True)
-    col = st.container()
+    # ── centred card: columns on desktop, CSS centering on mobile ──
+    _, col, _ = st.columns([1, 2.4, 1])
     with col:
         # Brand header
         st.markdown("""
