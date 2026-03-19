@@ -230,7 +230,7 @@ st.set_page_config(
     page_title="PharmaScan AI",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # ─────────────────────────────────────────────────────────────────
@@ -1827,8 +1827,8 @@ section[data-testid="stSidebar"] .stButton>button {{
 }}
 
 /* ── App cards / components ── */
-.hero {{ background:linear-gradient(135deg,#0d1b2a,#1a2744,#0f3460); border-radius:28px; padding:2.8rem 2rem 2.2rem; margin-bottom:2rem; text-align:center; border:1px solid rgba(99,102,241,0.2); box-shadow:0 32px 80px rgba(0,0,0,0.5); }}
-.app-name {{ font-family:'Syne',sans-serif !important; font-size:3.2rem; font-weight:800; letter-spacing:-2px; background:linear-gradient(90deg,#00f5a0,#00d9f5,#a78bfa,#f472b6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:0.3rem; }}
+.hero {{ background:linear-gradient(135deg,#0d1b2a,#1a2744,#0f3460); border-radius:28px; padding:clamp(1.2rem, 4vw, 2.8rem) clamp(0.8rem, 3vw, 2rem) clamp(1rem, 3vw, 2.2rem); margin-bottom:2rem; text-align:center; border:1px solid rgba(99,102,241,0.2); box-shadow:0 32px 80px rgba(0,0,0,0.5); }}
+.app-name {{ font-family:'Syne',sans-serif !important; font-size:clamp(1.6rem, 6vw, 3.2rem); font-weight:800; letter-spacing:-2px; background:linear-gradient(90deg,#00f5a0,#00d9f5,#a78bfa,#f472b6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:0.3rem; }}
 .app-sub {{ color:rgba(255,255,255,0.6) !important; font-size:0.95rem; margin-bottom:1.4rem; }}
 .pill {{ display:inline-block; margin:3px 4px; padding:4px 12px; border-radius:20px; font-size:0.73rem; font-weight:600; background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.85) !important; border:1px solid rgba(255,255,255,0.14); white-space:nowrap; }}
 .step {{ background:{'linear-gradient(135deg,#1e293b,#0f172a)' if DK else 'linear-gradient(135deg,#f8fafc,#eef2ff)'}; border-radius:18px; padding:1.2rem 0.7rem; text-align:center; border:1px solid {BDR}; transition:transform .25s,box-shadow .25s; overflow:hidden; }}
@@ -1942,6 +1942,95 @@ summary {{ color:{TXT} !important; font-weight:600; padding:0.5rem 0.8rem; font-
 .sp-bad {{ display:inline-block; background:rgba(239,68,68,0.18); color:#fca5a5 !important; padding:2px 8px; border-radius:6px; font-weight:700; margin:2px; border:1px solid rgba(239,68,68,0.3); font-size:0.8rem; }}
 .sp-fix {{ color:#86efac !important; font-weight:600; font-size:0.8rem; }}
 .footer {{ text-align:center; padding:2.2rem; margin-top:2rem; background:{'linear-gradient(135deg,#0d1b2a,#1b2a4a)' if DK else 'linear-gradient(135deg,#eef2ff,#f5f0ff)'}; border-radius:24px; border:1px solid {BDR}; }}
+
+/* ══ MOBILE RESPONSIVE ══════════════════════════════════════════ */
+@media (max-width: 768px) {{
+  /* Main content padding */
+  .block-container {{ padding: 0.5rem 0.6rem 1rem !important; max-width: 100% !important; }}
+
+  /* Hero section */
+  .hero {{ padding: 1.4rem 1rem 1.2rem !important; border-radius: 16px !important; margin-bottom: 1rem !important; }}
+  .app-name {{ font-size: 2rem !important; letter-spacing: -1px !important; }}
+  .app-sub {{ font-size: 0.82rem !important; margin-bottom: 0.9rem !important; }}
+  .pill {{ font-size: 0.66rem !important; padding: 3px 8px !important; margin: 2px 2px !important; }}
+
+  /* Step cards — stack 2 per row on mobile */
+  .step {{ padding: 0.85rem 0.4rem !important; border-radius: 12px !important; }}
+  .step-ico {{ font-size: 1.5rem !important; }}
+  .step-n {{ font-size: 0.55rem !important; }}
+  .step-l {{ font-size: 0.68rem !important; }}
+
+  /* Result cards */
+  .rc {{ padding: 0.7rem 0.85rem !important; font-size: 0.82rem !important; border-radius: 12px !important; }}
+  .mc {{ padding: 0.75rem 0.85rem !important; border-radius: 10px !important; }}
+  .mc p {{ font-size: 0.8rem !important; }}
+
+  /* Vision chips */
+  .vc {{ padding: 0.75rem 0.3rem !important; border-radius: 10px !important; }}
+  .vc-ico {{ font-size: 1.2rem !important; }}
+  .vc-lbl {{ font-size: 0.58rem !important; }}
+  .vc-val {{ font-size: 0.82rem !important; }}
+
+  /* Metric boxes */
+  .mb {{ padding: 0.9rem 0.5rem !important; border-radius: 12px !important; }}
+  .mb-n {{ font-size: 1.5rem !important; }}
+  .mb-l {{ font-size: 0.62rem !important; }}
+
+  /* Tabs — allow wrapping on small screens */
+  .stTabs [data-baseweb="tab-list"] {{ flex-wrap: wrap !important; gap: 2px !important; padding: 3px !important; }}
+  .stTabs [data-baseweb="tab"] {{ font-size: 0.72rem !important; padding: 5px 8px !important; white-space: nowrap !important; }}
+
+  /* Sidebar — collapse-friendly */
+  section[data-testid="stSidebar"] {{ min-width: 0 !important; }}
+  section[data-testid="stSidebar"] .stButton>button {{ font-size: 0.78rem !important; padding: 0.4rem 0.7rem !important; }}
+
+  /* Buttons */
+  .stButton>button {{ font-size: 0.8rem !important; padding: 0.45rem 1rem !important; }}
+
+  /* Columns — prevent overflow */
+  [data-testid="column"] {{ min-width: 0 !important; overflow: hidden !important; }}
+
+  /* Plotly charts — full width */
+  .js-plotly-plot, .plotly {{ max-width: 100% !important; }}
+
+  /* Folium map */
+  iframe {{ max-width: 100% !important; border-radius: 12px !important; }}
+
+  /* DataFrames/tables — horizontal scroll */
+  [data-testid="stDataFrame"], .stDataFrame {{ overflow-x: auto !important; max-width: 100% !important; }}
+  [data-testid="stDataFrame"] > div {{ overflow-x: auto !important; }}
+
+  /* File uploader */
+  [data-testid="stFileUploader"] {{ padding: 6px !important; }}
+  [data-testid="stFileUploader"] * {{ font-size: 0.75rem !important; }}
+
+  /* Section headers */
+  .sh {{ font-size: 0.6rem !important; }}
+
+  /* Expander titles */
+  [data-testid="stExpander"] summary p {{ font-size: 0.8rem !important; }}
+
+  /* Footer */
+  .footer {{ padding: 1.2rem 0.8rem !important; border-radius: 14px !important; }}
+  .footer * {{ font-size: 0.78rem !important; }}
+
+  /* Admin section */
+  .adm-section {{ padding: 0.6rem !important; }}
+  .adm-sec-title {{ font-size: 0.85rem !important; }}
+
+  /* Pulse alert */
+  .pulse {{ padding: 0.7rem 0.85rem !important; font-size: 0.82rem !important; }}
+}}
+
+@media (max-width: 480px) {{
+  /* Extra small phones */
+  .block-container {{ padding: 0.3rem 0.4rem 0.8rem !important; }}
+  .app-name {{ font-size: 1.6rem !important; }}
+  .hero {{ padding: 1rem 0.8rem !important; border-radius: 12px !important; }}
+  .stTabs [data-baseweb="tab"] {{ font-size: 0.68rem !important; padding: 4px 6px !important; }}
+  .mb-n {{ font-size: 1.3rem !important; }}
+  .rc {{ font-size: 0.78rem !important; }}
+}}
 </style>"""
 
 # ═══════════════════════════════════════════════════════════════════
@@ -2074,8 +2163,9 @@ header[data-testid="stHeader"]{display:none!important}
 <div class="ps-beam"></div>
 """, unsafe_allow_html=True)
 
-    # ── centred card using Streamlit columns ───────────────────────
-    _, col, _ = st.columns([1, 2.4, 1])
+    # ── centred card — works on all screen sizes ───────────────────
+    st.markdown('<div style="max-width:440px;margin:0 auto;padding:0 8px">', unsafe_allow_html=True)
+    col = st.container()
     with col:
         # Brand header
         st.markdown("""
@@ -4451,6 +4541,26 @@ border-radius:12px;padding:12px 16px;font-size:.82rem;color:#94a3b8;line-height:
 # ─────────────────────────────────────────────────────────────────
 # ENTRY POINT
 # ─────────────────────────────────────────────────────────────────
+
+# Inject viewport meta tag for proper mobile scaling
+st.markdown("""
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<style>
+/* Global mobile fix: prevent horizontal overflow */
+html, body { overflow-x: hidden !important; }
+.block-container { overflow-x: hidden !important; }
+/* Ensure all images/iframes don't overflow */
+img, iframe, video { max-width: 100% !important; height: auto !important; }
+/* Streamlit default container max-width on mobile */
+@media (max-width: 768px) {
+  .block-container { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+  /* collapse sidebar by default, show as overlay */
+  section[data-testid="stSidebar"] { transform: translateX(-100%); transition: transform 0.3s; }
+  section[data-testid="stSidebar"][aria-expanded="true"] { transform: translateX(0); }
+}
+</style>
+""", unsafe_allow_html=True)
+
 if not st.session_state.logged_in:
     show_login()
 elif st.session_state.get("user_role") == "admin":
