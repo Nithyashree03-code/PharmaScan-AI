@@ -2147,17 +2147,10 @@ header[data-testid="stHeader"]{display:none!important}
 /* ── fp panel ── */
 .ps-fp{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.4);
   border-radius:16px;padding:16px;margin-bottom:8px}
-/* MOBILE — wrap the login content in a centered max-width box */
+/* MOBILE — shrink outer spacer columns, expand center card */
 @media(max-width:768px){
-  /* Shrink the outer spacer columns to near-zero so center col fills screen */
-  [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
-  [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child{
-    flex:0 0 4px!important;min-width:4px!important;max-width:4px!important;
-    overflow:hidden!important;padding:0!important;
-  }
-  [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2){
-    flex:1 1 auto!important;min-width:0!important;max-width:100%!important;
-  }
+  .login-outer-col{flex:0 0 2px!important;min-width:2px!important;max-width:2px!important;overflow:hidden!important;padding:0!important;visibility:hidden!important}
+  .login-center-col{flex:1 1 auto!important;min-width:0!important;max-width:100%!important}
   .ps-card{padding:18px 16px 14px;border-radius:18px}
   .ps-brand{font-size:1.25rem}
   .ps-shield{width:42px;height:42px;font-size:1.1rem}
@@ -2176,6 +2169,26 @@ header[data-testid="stHeader"]{display:none!important}
   <div class="ps-blob c"></div>
 </div>
 <div class="ps-beam"></div>
+<script>
+// Label the login columns so CSS can target them reliably
+(function labelLoginCols(){
+  function run(){
+    var blocks = document.querySelectorAll('[data-testid="stHorizontalBlock"]');
+    blocks.forEach(function(block){
+      var cols = block.querySelectorAll(':scope > [data-testid="column"]');
+      if(cols.length === 3){
+        cols[0].classList.add('login-outer-col');
+        cols[1].classList.add('login-center-col');
+        cols[2].classList.add('login-outer-col');
+      }
+    });
+  }
+  // Run immediately and again after Streamlit hydrates
+  run();
+  setTimeout(run, 300);
+  setTimeout(run, 800);
+})();
+</script>
 """, unsafe_allow_html=True)
 
     # ── centred card: columns on desktop, CSS centering on mobile ──
