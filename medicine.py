@@ -3062,7 +3062,7 @@ div.nav-row [data-testid="column"]:last-child .stButton>button {{
 </style>""", unsafe_allow_html=True)
 
     st.markdown('<div class="nav-row">', unsafe_allow_html=True)
-    nb_brand, nb1, nb2, nb3 = st.columns([6.5, 0.7, 0.7, 0.7])
+    nb_brand, nb1, nb2 = st.columns([7.5, 0.7, 0.7])
     with nb_brand:
         st.markdown(
             f'<p style="color:#a78bfa;font-family:Syne,sans-serif;font-weight:800;'
@@ -3078,12 +3078,6 @@ div.nav-row [data-testid="column"]:last-child .stButton>button {{
         if st.button("🌙" if DK else "☀️", key="btn_top_theme", use_container_width=True):
             st.session_state.dark_mode = not DK
             _save_session(username, user_role, user_email)
-            st.rerun()
-    with nb3:
-        if st.button("🚪", key="btn_top_logout", use_container_width=True):
-            _clear_session()
-            for k in list(DEFAULTS.keys()):
-                st.session_state[k] = DEFAULTS[k]
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
