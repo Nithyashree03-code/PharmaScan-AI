@@ -74,7 +74,9 @@ SENDER_APP_PASS  = "qmavgvamacgkbjyt"
 DB_PATH      = "pharmascan.db"
 ACCOUNTS_DIR = "pharmascan_accounts"  # folder where account records are saved
 DATA_DIR     = "pharmascan_data"      # folder for all CSV login/user data
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+import os
+if os.name == "nt":  # Windows only
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 import os as _os
 _os.makedirs(ACCOUNTS_DIR, exist_ok=True)
