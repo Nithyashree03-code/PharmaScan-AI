@@ -1764,6 +1764,48 @@ body, .stMarkdown, .stText, p, span, div, label, button,
 [data-testid="stSidebar"] {{ font-family:'DM Sans',sans-serif !important; }}
 h1,h2,h3 {{ font-family:'Syne',sans-serif !important; }}
 
+/* ── Hide sidebar toggle text, keep only the ☰ icon ── */
+button[data-testid="stSidebarNavToggleButton"] span,
+button[data-testid="stSidebarCollapsedControl"] span,
+[data-testid="stSidebarCollapsedControl"] span,
+[data-testid="collapsedControl"] span {{ display: none !important; }}
+
+button[data-testid="stSidebarNavToggleButton"],
+button[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"] {{
+  font-size: 0 !important;
+  color: transparent !important;
+  background: rgba(99,102,241,0.15) !important;
+  border: 1px solid rgba(99,102,241,0.35) !important;
+  border-radius: 8px !important;
+  width: 36px !important; height: 36px !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+}}
+button[data-testid="stSidebarNavToggleButton"]::before,
+button[data-testid="stSidebarCollapsedControl"]::before,
+[data-testid="stSidebarCollapsedControl"]::before,
+[data-testid="collapsedControl"]::before {{
+  content: "☰" !important;
+  font-size: 1.1rem !important;
+  color: #a78bfa !important;
+  display: block !important;
+}}
+
+/* Also hide any header label text that says keyboard_double */
+header[data-testid="stHeader"] button span,
+header[data-testid="stHeader"] button p {{ display: none !important; }}
+header[data-testid="stHeader"] button {{
+  font-size: 0 !important;
+  color: transparent !important;
+}}
+header[data-testid="stHeader"] button::before {{
+  content: "☰" !important;
+  font-size: 1.1rem !important;
+  color: #a78bfa !important;
+  display: block !important;
+}}
+
 /* ── Prevent ALL overflow / collision ── */
 * {{ box-sizing:border-box !important; }}
 p, span, div, label {{
@@ -1945,91 +1987,69 @@ summary {{ color:{TXT} !important; font-weight:600; padding:0.5rem 0.8rem; font-
 
 /* ══ MOBILE RESPONSIVE ══════════════════════════════════════════ */
 @media (max-width: 768px) {{
-  /* Main content padding */
-  .block-container {{ padding: 0.5rem 0.6rem 1rem !important; max-width: 100% !important; }}
+  .block-container {{ padding: 0.4rem 0.5rem 1rem !important; max-width: 100% !important; }}
 
-  /* Hero section */
-  .hero {{ padding: 1.4rem 1rem 1.2rem !important; border-radius: 16px !important; margin-bottom: 1rem !important; }}
-  .app-name {{ font-size: 2rem !important; letter-spacing: -1px !important; }}
-  .app-sub {{ font-size: 0.82rem !important; margin-bottom: 0.9rem !important; }}
-  .pill {{ font-size: 0.66rem !important; padding: 3px 8px !important; margin: 2px 2px !important; }}
+  /* Hero compact */
+  .hero {{ padding: 1rem 0.9rem !important; border-radius: 14px !important; margin-bottom: 0.8rem !important; }}
+  .app-name {{ font-size: 1.45rem !important; letter-spacing: -0.5px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }}
+  .app-sub {{ font-size: 0.73rem !important; margin-bottom: 0.6rem !important; }}
+  .hero-pills {{ display: flex !important; flex-wrap: wrap !important; gap: 3px !important; justify-content: center !important; }}
+  .pill {{ font-size: 0.62rem !important; padding: 2px 7px !important; margin: 1px !important; }}
 
-  /* Step cards — stack 2 per row on mobile */
-  .step {{ padding: 0.85rem 0.4rem !important; border-radius: 12px !important; }}
-  .step-ico {{ font-size: 1.5rem !important; }}
-  .step-n {{ font-size: 0.55rem !important; }}
-  .step-l {{ font-size: 0.68rem !important; }}
+  /* Step cards — smaller and tighter */
+  .step {{ padding: 0.5rem 0.2rem !important; border-radius: 10px !important; }}
+  .step-ico {{ font-size: 1rem !important; }}
+  .step-n {{ font-size: 0.48rem !important; letter-spacing: 0.3px !important; }}
+  .step-l {{ font-size: 0.58rem !important; }}
 
-  /* Result cards */
-  .rc {{ padding: 0.7rem 0.85rem !important; font-size: 0.82rem !important; border-radius: 12px !important; }}
-  .mc {{ padding: 0.75rem 0.85rem !important; border-radius: 10px !important; }}
-  .mc p {{ font-size: 0.8rem !important; }}
+  /* Tabs — SCROLL horizontally, never wrap */
+  .stTabs [data-baseweb="tab-list"] {{
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding: 3px 4px !important;
+    gap: 2px !important;
+  }}
+  .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {{ display: none !important; }}
+  .stTabs [data-baseweb="tab"] {{
+    font-size: 0.68rem !important;
+    padding: 5px 7px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }}
 
-  /* Vision chips */
-  .vc {{ padding: 0.75rem 0.3rem !important; border-radius: 10px !important; }}
-  .vc-ico {{ font-size: 1.2rem !important; }}
-  .vc-lbl {{ font-size: 0.58rem !important; }}
-  .vc-val {{ font-size: 0.82rem !important; }}
+  /* Cards */
+  .rc {{ padding: 0.65rem 0.75rem !important; font-size: 0.79rem !important; border-radius: 10px !important; }}
+  .mc {{ padding: 0.65rem 0.75rem !important; border-radius: 10px !important; }}
+  .mc p {{ font-size: 0.78rem !important; }}
+  .vc {{ padding: 0.55rem 0.25rem !important; border-radius: 9px !important; }}
+  .vc-ico {{ font-size: 1rem !important; }}
+  .vc-lbl {{ font-size: 0.53rem !important; }}
+  .vc-val {{ font-size: 0.76rem !important; }}
+  .mb {{ padding: 0.8rem 0.45rem !important; border-radius: 11px !important; }}
+  .mb-n {{ font-size: 1.4rem !important; }}
+  .mb-l {{ font-size: 0.58rem !important; }}
 
-  /* Metric boxes */
-  .mb {{ padding: 0.9rem 0.5rem !important; border-radius: 12px !important; }}
-  .mb-n {{ font-size: 1.5rem !important; }}
-  .mb-l {{ font-size: 0.62rem !important; }}
-
-  /* Tabs — allow wrapping on small screens */
-  .stTabs [data-baseweb="tab-list"] {{ flex-wrap: wrap !important; gap: 2px !important; padding: 3px !important; }}
-  .stTabs [data-baseweb="tab"] {{ font-size: 0.72rem !important; padding: 5px 8px !important; white-space: nowrap !important; }}
-
-  /* Sidebar — collapse-friendly */
-  section[data-testid="stSidebar"] {{ min-width: 0 !important; }}
-  section[data-testid="stSidebar"] .stButton>button {{ font-size: 0.78rem !important; padding: 0.4rem 0.7rem !important; }}
-
-  /* Buttons */
-  .stButton>button {{ font-size: 0.8rem !important; padding: 0.45rem 1rem !important; }}
-
-  /* Columns — prevent overflow */
+  /* Prevent column overflow */
   [data-testid="column"] {{ min-width: 0 !important; overflow: hidden !important; }}
-
-  /* Plotly charts — full width */
   .js-plotly-plot, .plotly {{ max-width: 100% !important; }}
-
-  /* Folium map */
-  iframe {{ max-width: 100% !important; border-radius: 12px !important; }}
-
-  /* DataFrames/tables — horizontal scroll */
-  [data-testid="stDataFrame"], .stDataFrame {{ overflow-x: auto !important; max-width: 100% !important; }}
-  [data-testid="stDataFrame"] > div {{ overflow-x: auto !important; }}
-
-  /* File uploader */
-  [data-testid="stFileUploader"] {{ padding: 6px !important; }}
-  [data-testid="stFileUploader"] * {{ font-size: 0.75rem !important; }}
-
-  /* Section headers */
-  .sh {{ font-size: 0.6rem !important; }}
-
-  /* Expander titles */
-  [data-testid="stExpander"] summary p {{ font-size: 0.8rem !important; }}
-
-  /* Footer */
-  .footer {{ padding: 1.2rem 0.8rem !important; border-radius: 14px !important; }}
-  .footer * {{ font-size: 0.78rem !important; }}
-
-  /* Admin section */
-  .adm-section {{ padding: 0.6rem !important; }}
-  .adm-sec-title {{ font-size: 0.85rem !important; }}
-
-  /* Pulse alert */
-  .pulse {{ padding: 0.7rem 0.85rem !important; font-size: 0.82rem !important; }}
+  iframe {{ max-width: 100% !important; border-radius: 10px !important; }}
+  [data-testid="stDataFrame"] {{ overflow-x: auto !important; max-width: 100% !important; }}
+  [data-testid="stFileUploader"] {{ padding: 5px !important; }}
+  [data-testid="stFileUploader"] * {{ font-size: 0.73rem !important; }}
+  .stButton>button {{ font-size: 0.78rem !important; padding: 0.4rem 0.9rem !important; }}
+  section[data-testid="stSidebar"] {{ min-width: 0 !important; }}
+  .footer {{ padding: 1rem 0.7rem !important; border-radius: 12px !important; }}
+  .pulse {{ padding: 0.65rem 0.75rem !important; font-size: 0.79rem !important; }}
 }}
 
-@media (max-width: 480px) {{
-  /* Extra small phones */
-  .block-container {{ padding: 0.3rem 0.4rem 0.8rem !important; }}
-  .app-name {{ font-size: 1.6rem !important; }}
-  .hero {{ padding: 1rem 0.8rem !important; border-radius: 12px !important; }}
-  .stTabs [data-baseweb="tab"] {{ font-size: 0.68rem !important; padding: 4px 6px !important; }}
-  .mb-n {{ font-size: 1.3rem !important; }}
-  .rc {{ font-size: 0.78rem !important; }}
+@media (max-width: 420px) {{
+  .app-name {{ font-size: 1.2rem !important; }}
+  .stTabs [data-baseweb="tab"] {{ font-size: 0.62rem !important; padding: 4px 6px !important; }}
+  .step-ico {{ font-size: 0.9rem !important; }}
+  .step-l {{ font-size: 0.52rem !important; }}
 }}
 </style>"""
 
@@ -2836,20 +2856,20 @@ def show_app():
     st.markdown("""
     <div class="hero">
       <div class="app-name">🛡️ PharmaScan AI</div>
-      <div class="app-sub">Vision-Based Fake Medicine Detection System · Hackathon Edition</div>
-      <div>
-        <span class="pill">🧠 Computer Vision</span>
-        <span class="pill">📸 Live Camera</span>
-        <span class="pill">🔤 Multilingual OCR</span>
-        <span class="pill">🔡 Spell Check</span>
-        <span class="pill">📄 PDF Report</span>
-        <span class="pill">📧 Email Alert</span>
+      <div class="app-sub">Vision-Based Fake Medicine Detection · Hackathon Edition</div>
+      <div class="hero-pills">
+        <span class="pill">🧠 Vision</span>
+        <span class="pill">📸 Camera</span>
+        <span class="pill">🔤 OCR</span>
+        <span class="pill">🔡 Spell</span>
+        <span class="pill">📄 PDF</span>
+        <span class="pill">📧 Alert</span>
         <span class="pill">🗺️ Heatmap</span>
-        <span class="pill">🔗 NIH DB</span>
-        <span class="pill">🏥 FDA Data</span>
-        <span class="pill">💊 Med Compare</span>
-        <span class="pill">🔮 Hotspot AI</span>
-        <span class="pill">🏅 Certificate</span>
+        <span class="pill">🔗 NIH</span>
+        <span class="pill">🏥 FDA</span>
+        <span class="pill">💊 Compare</span>
+        <span class="pill">🔮 Hotspot</span>
+        <span class="pill">🏅 Cert</span>
       </div>
     </div>
     """, unsafe_allow_html=True)
