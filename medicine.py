@@ -2988,20 +2988,27 @@ section[data-testid="stSidebar"]{display:none!important}
   color:#a78bfa!important; position:absolute!important;
   pointer-events:none!important;
 }}
-/* Navbar: style the columns block */
+/* Navbar wrapper */
 div.nav-row [data-testid="stHorizontalBlock"] {{
   background:rgba(15,23,42,0.88)!important;
   border:1px solid rgba(99,102,241,0.2)!important;
   border-radius:14px!important;
-  padding:4px 10px 4px 54px!important;
-  margin-bottom:14px!important;
+  padding:4px 8px 4px 52px!important;
+  margin-bottom:12px!important;
   gap:0px!important;
   align-items:center!important;
+  flex-wrap:nowrap!important;
 }}
-/* All columns equal minimal padding */
 div.nav-row [data-testid="column"] {{
-  padding:0 3px!important;
+  padding:0 2px!important;
   min-width:0!important;
+  flex-shrink:1!important;
+}}
+/* Brand column — shrink text on mobile */
+div.nav-row [data-testid="column"]:first-child {{
+  flex-shrink:1!important;
+  min-width:0!important;
+  overflow:hidden!important;
 }}
 /* Nav buttons */
 div.nav-row .stButton>button {{
@@ -3009,9 +3016,9 @@ div.nav-row .stButton>button {{
   border:1px solid rgba(99,102,241,0.3)!important;
   border-radius:20px!important;
   color:#c4b5fd!important;
-  font-size:0.73rem!important;
+  font-size:0.72rem!important;
   font-weight:600!important;
-  padding:3px 10px!important;
+  padding:3px 8px!important;
   box-shadow:none!important;
   min-height:26px!important;
   height:26px!important;
@@ -3024,20 +3031,34 @@ div.nav-row .stButton>button:hover {{
   background:rgba(99,102,241,0.28)!important;
   transform:none!important; box-shadow:none!important;
 }}
-/* Logout red */
 div.nav-row [data-testid="column"]:last-child .stButton>button {{
   background:rgba(239,68,68,0.12)!important;
   border-color:rgba(239,68,68,0.28)!important;
   color:#fca5a5!important;
 }}
+/* Mobile: shrink brand text */
+@media(max-width:768px){{
+  div.nav-row [data-testid="stHorizontalBlock"] {{
+    padding:4px 6px 4px 48px!important;
+  }}
+  div.nav-row .stButton>button {{
+    font-size:0.65rem!important;
+    padding:3px 5px!important;
+  }}
+}}
 </style>""", unsafe_allow_html=True)
 
     st.markdown('<div class="nav-row">', unsafe_allow_html=True)
-    nb_brand, nb1, nb2, nb3 = st.columns([5.5, 1.3, 0.6, 1.2])
+    nb_brand, nb1, nb2, nb3 = st.columns([7.5, 0.6, 0.6, 0.6])
     with nb_brand:
-        st.markdown(f'<p style="color:#a78bfa;font-family:Syne,sans-serif;font-weight:800;font-size:.92rem;margin:0;padding-top:3px;white-space:nowrap">🛡️ PharmaScan AI &nbsp;<span style="color:#475569;font-size:.72rem;font-weight:400">· 👤 {username}</span></p>', unsafe_allow_html=True)
+        st.markdown(
+            f'<p style="color:#a78bfa;font-family:Syne,sans-serif;font-weight:800;'
+            f'font-size:clamp(0.7rem,2vw,0.92rem);margin:0;padding-top:3px;'
+            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+            f'🛡️ PharmaScan &nbsp;<span style="color:#475569;font-size:.68rem;font-weight:400">👤 {username}</span></p>',
+            unsafe_allow_html=True)
     with nb1:
-        if st.button("👤 Profile", key="btn_top_profile", use_container_width=True):
+        if st.button("👤", key="btn_top_profile", use_container_width=True):
             st.session_state["show_profile"] = True
             st.rerun()
     with nb2:
@@ -3046,7 +3067,7 @@ div.nav-row [data-testid="column"]:last-child .stButton>button {{
             _save_session(username, user_role, user_email)
             st.rerun()
     with nb3:
-        if st.button("🚪 Logout", key="btn_top_logout", use_container_width=True):
+        if st.button("🚪", key="btn_top_logout", use_container_width=True):
             _clear_session()
             for k in list(DEFAULTS.keys()):
                 st.session_state[k] = DEFAULTS[k]
