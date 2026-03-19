@@ -2138,6 +2138,13 @@ div[data-testid="stHorizontalBlock"]:first-of-type .stButton>button:hover {{
   [data-testid="stFileUploader"] {{ padding: 5px !important; }}
   [data-testid="stFileUploader"] * {{ font-size: 0.73rem !important; }}
   .stButton>button {{ font-size: 0.78rem !important; padding: 0.4rem 0.9rem !important; }}
+  /* Nav icon buttons stay small and don't overflow */
+  div.nav-row .stButton>button {{ 
+    font-size: 1rem !important; 
+    padding: 2px 4px !important; 
+    min-width: 36px !important;
+    overflow: visible !important;
+  }}
   section[data-testid="stSidebar"] {{ min-width: 0 !important; }}
   .footer {{ padding: 1rem 0.7rem !important; border-radius: 12px !important; }}
   .pulse {{ padding: 0.65rem 0.75rem !important; font-size: 0.79rem !important; }}
@@ -2274,12 +2281,18 @@ header[data-testid="stHeader"]{display:none!important}
   .ps-card{padding:20px 16px 16px!important;border-radius:20px!important}
   .ps-brand{font-size:1.2rem!important}
   .ps-shield{width:40px!important;height:40px!important;font-size:1.1rem!important}
-  /* Make login/register buttons normal width not full-width */
-  .stButton>button{width:auto!important;min-width:120px!important}
+  /* Fix Patient/Expert role buttons — keep side by side, not full width */
+  .stButton>button{width:100%!important}
+  /* Role selector buttons must stay in 2 columns side by side */
+  [data-testid="stHorizontalBlock"] .stButton>button{
+    width:100%!important; font-size:.82rem!important; padding:.45rem .5rem!important;
+  }
   .stTabs [data-baseweb="tab"]{font-size:.78rem!important;padding:6px 12px!important}
-  /* Hide Streamlit's deploy/github buttons in header */
-  header[data-testid="stHeader"] a,
-  header[data-testid="stHeader"] [data-testid="stDecoration"]{ display:none!important }
+  /* Fix green/teal background bleed from Streamlit default theme */
+  .stApp,.main,.block-container{background:transparent!important}
+  section[data-testid="stSidebar"]{display:none!important}
+  /* Kill the scan beam animation on very small screens */
+  .ps-beam{display:none!important}
 }
 @media(max-width:480px){
   .ps-card{padding:16px 12px 14px!important;border-radius:16px!important}
@@ -3049,7 +3062,7 @@ div.nav-row [data-testid="column"]:last-child .stButton>button {{
 </style>""", unsafe_allow_html=True)
 
     st.markdown('<div class="nav-row">', unsafe_allow_html=True)
-    nb_brand, nb1, nb2, nb3 = st.columns([7.5, 0.6, 0.6, 0.6])
+    nb_brand, nb1, nb2, nb3 = st.columns([6.5, 0.7, 0.7, 0.7])
     with nb_brand:
         st.markdown(
             f'<p style="color:#a78bfa;font-family:Syne,sans-serif;font-weight:800;'
