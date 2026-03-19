@@ -1,0 +1,125 @@
+========================================================
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  Username    : aarifa_4
+  Email       : royalmdn02@gmail.com
+  Role        : Patient / User
+  Created At  : 2026-03-19 12:09
+========================================================
+
+  ACTIVITY LOG
+  ----------------------------------------------------
+  [2026-03-19 12:09:58]  REGISTERED
+  [2026-03-19 12:22:46]  LOGIN
+  [2026-03-19 12:50:23]  LOGIN
+

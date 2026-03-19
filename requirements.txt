@@ -1,0 +1,12 @@
+streamlit
+opencv-python-headless
+pytesseract
+Pillow
+numpy
+pandas
+plotly
+folium
+streamlit-folium
+requests
+reportlab
+easyocr

@@ -1,0 +1,126 @@
+========================================================
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  PharmaScan AI - Account Record
+=
+  Username    : nithya
+  Email       : nshree03112005@gmail.com
+  Role        : Expert / Pharmacist
+  Created At  : 2026-03-19 13:56
+  ID Type     : Medical Council Registration Card
+  License No. : TN-MEd-6657
+  ID Document : images (2).jpg
+========================================================
+
+  ACTIVITY LOG
+  ----------------------------------------------------
+  [2026-03-19 13:56:12]  REGISTERED
+

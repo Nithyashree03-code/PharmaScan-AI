@@ -1,0 +1,3 @@
+id,username,email,password_hash,created_at,role,id_type,id_number,id_filename,id_verified
+1,aarifa,royalmdn02@gmail.com,06b2b9f3bb9bc5cfeb0a6290568106e41c49e6e4d0c5a9cfd4a2d1d97d104dda,2026-03-19 13:52,user,,,,0
+2,nithya,nshree03112005@gmail.com,8f8cbd3fa291f367233c2936efdcd607dd5256b3e842c29e958441dfeff89da1,2026-03-19 13:56,expert,🏥 Medical Council Registration Card,TN-MEd-6657,images (2).jpg,1
