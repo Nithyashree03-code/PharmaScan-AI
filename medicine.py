@@ -22,11 +22,11 @@ FEATURES:
 # IMPORTS
 # ─────────────────────────────────────────────────────────────────
 import streamlit as st
-import pytesseract
 import cv2
 import numpy as np
 from PIL import Image
-import re, json, sqlite3, smtplib, ssl, io, hashlib, time
+import re, json, sqlite3, smtplib, ssl, io, hashlib, time, shutil, random, string
+from collections import Counter
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -38,6 +38,35 @@ import plotly.express as px
 import folium
 from streamlit_folium import st_folium
 
+# ── Tesseract OCR: safe import with auto-detection on Windows ─────
+TESSERACT_OK = False
+try:
+    import pytesseract
+    import os as _toss
+    if _toss.name == "nt":
+        _candidates = [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            r"C:\Users\{}\AppData\Local\Tesseract-OCR\tesseract.exe".format(
+                _toss.environ.get("USERNAME", "")),
+        ]
+        for _cp in _candidates:
+            if _toss.path.isfile(_cp):
+                pytesseract.pytesseract.tesseract_cmd = _cp
+                break
+        else:
+            _fw = shutil.which("tesseract")
+            if _fw:
+                pytesseract.pytesseract.tesseract_cmd = _fw
+    else:
+        _fw2 = shutil.which("tesseract") or "/usr/bin/tesseract"
+        pytesseract.pytesseract.tesseract_cmd = _fw2
+    pytesseract.get_tesseract_version()
+    TESSERACT_OK = True
+except Exception:
+    TESSERACT_OK = False
+
+# ── EasyOCR: optional fallback ────────────────────────────────────
 try:
     import easyocr
     EASYOCR_OK = True
@@ -58,26 +87,22 @@ except Exception:
     PDF_OK = False
 
 # ─────────────────────────────────────────────────────────────────
-# ★★★  EDIT THESE THREE LINES ONLY  ★★★
+# CREDENTIALS — works locally AND on Streamlit Cloud
 # ─────────────────────────────────────────────────────────────────
-GEMINI_API_KEY   = ""  # Gemini removed
+GEMINI_API_KEY = ""
 
-SENDER_EMAIL     = "pharmascanai26@gmail.com"
-# ↑ Create a dedicated Gmail account for PharmaScan to send alerts FROM
-# ↑ Change this to that Gmail address
-
-SENDER_APP_PASS  = "qmavgvamacgkbjyt"
-# ↑ Gmail → Security → 2-Step Verification ON → App Passwords → generate
-# ↑ Paste the 16-character app password here
+try:
+    SENDER_EMAIL    = st.secrets["SENDER_EMAIL"]
+    SENDER_APP_PASS = st.secrets["SENDER_APP_PASS"]
+except Exception:
+    SENDER_EMAIL    = "pharmascanai26@gmail.com"
+    SENDER_APP_PASS = "qmavgvamacgkbjyt"  
 
 # ─────────────────────────────────────────────────────────────────
 DB_PATH      = "pharmascan.db"
-ACCOUNTS_DIR = "pharmascan_accounts"  # folder where account records are saved
-DATA_DIR     = "pharmascan_data"      # folder for all CSV login/user data
+ACCOUNTS_DIR = "pharmascan_accounts"
+DATA_DIR     = "pharmascan_data"
 import os
-if os.name == "nt":  # Windows only
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-
 import os as _os
 _os.makedirs(ACCOUNTS_DIR, exist_ok=True)
 _os.makedirs(DATA_DIR, exist_ok=True)
@@ -201,7 +226,10 @@ def _delete_account_file(username):
 # ─────────────────────────────────────────────────────────────────
 ADMIN_USERNAME = "pharmascanai26@gmail.com"
 ADMIN_PASSWORD_HASH = hashlib.sha256("scan@26".encode()).hexdigest()
-ADMIN_EMAIL    = "pharmascanai26@gmail.com"
+try:
+    ADMIN_EMAIL = st.secrets["ADMIN_EMAIL"]
+except Exception:
+    ADMIN_EMAIL = "pharmascanai26@gmail.com" 
 
 def is_admin_login(username, password):
     """Check if credentials match the superadmin account."""
@@ -269,36 +297,6 @@ DEFAULTS = {
 # ─────────────────────────────────────────────────────────────────
 # SESSION STATE
 # ─────────────────────────────────────────────────────────────────
-DEFAULTS = {
-    "logged_in":        False,
-    "user_role":        "",   # "user", "expert", or "admin"
-    "username":         "",
-    "user_email":       "",   # login Gmail → used as alert receiver
-    "dark_mode":        True,
-    "chat_messages":    [],
-    "scan_result":      None,
-    "current_medicine": None,
-    "ocr_text":         "",
-    "alert_sent":       False,
-    "login_error":      "",
-    "reg_error":        "",
-    "reg_ok":           False,
-    "alert_err":        "",
-    "cam_result":       None,
-    "cam_bytes":        None,
-    "cam_arr":          None,
-    "pharmacy_map":     None,
-    "pharmacy_count":   0,
-    "hotspot_prediction": None,
-    "upload_img_arr":    None,
-    "confirm_delete":    False,
-    "otp_code":          "",
-    "otp_email":         "",
-    "otp_verified":      False,
-    "otp_sent":          False,
-    "otp_pending_user":  "",
-    "otp_pending_pass":  "",
-}
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -552,17 +550,42 @@ def preprocess(img):
     k  = np.ones((1,1), np.uint8)
     return cv2.erode(cv2.dilate(t, k), k)
 
+@st.cache_resource
+def _get_easyocr_reader(langs_tuple):
+    """Cached EasyOCR reader — creating it is expensive (5-10 sec each call)."""
+    if not EASYOCR_OK:
+        return None
+    try:
+        return easyocr.Reader(list(langs_tuple), verbose=False)
+    except Exception:
+        return None
+
 def run_ocr(img, langs=None):
+    """Run OCR using Tesseract and/or EasyOCR. Never crashes — returns empty string if neither available."""
     proc = preprocess(img)
-    t1   = pytesseract.image_to_string(proc, config="--psm 6")
-    t2   = ""
+    t1 = ""
+    t2 = ""
+
+    # Tesseract (primary)
+    if TESSERACT_OK:
+        try:
+            t1 = pytesseract.image_to_string(proc, config="--psm 6")
+        except Exception:
+            t1 = ""
+
+    # EasyOCR (fallback / supplement) — reader is cached via @st.cache_resource
     if EASYOCR_OK:
         try:
-            r  = easyocr.Reader(langs or ["en"], verbose=False)
-            t2 = " ".join([x[1] for x in r.readtext(img)])
+            reader = _get_easyocr_reader(tuple(langs or ["en"]))
+            if reader:
+                t2 = " ".join([x[1] for x in reader.readtext(img)])
         except Exception:
-            pass
-    return (t1 + " " + t2).strip()
+            t2 = ""
+
+    result = (t1 + " " + t2).strip()
+    if not result and not TESSERACT_OK and not EASYOCR_OK:
+        return "[OCR unavailable — install Tesseract to enable text scanning]"
+    return result
 
 def vision_analyze(img):
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
@@ -3166,9 +3189,147 @@ div.nav-row [data-testid="column"]:last-child .stButton>button {{
         with L:
             st.markdown(f'<p style="color:{TXT};font-size:1.1rem;font-weight:700">📷 Upload Medicine Image</p>',
                         unsafe_allow_html=True)
-            uf = st.file_uploader("Drop image here",
-                                   type=["jpg","png","jpeg","webp"],
-                                   label_visibility="collapsed")
+
+            # ── Permission handling: fires on Browse-click, not upfront ──
+            st.markdown("""
+<style>
+/* Subtle status badge — hidden until user interacts */
+#ps-perm-status {
+  display: none; font-size: 0.78rem; font-weight: 600;
+  padding: 7px 14px; border-radius: 8px; margin-bottom: 8px;
+  text-align: left; line-height: 1.5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  animation: ps-fadein 0.3s ease;
+}
+@keyframes ps-fadein { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+#ps-perm-status.ps-granted {
+  background: rgba(16,185,129,0.10); border: 1.5px solid rgba(16,185,129,0.35); color: #10b981;
+}
+#ps-perm-status.ps-denied {
+  background: rgba(239,68,68,0.09); border: 1.5px solid rgba(239,68,68,0.3); color: #ef4444;
+}
+#ps-perm-status.ps-loading {
+  background: rgba(99,102,241,0.09); border: 1.5px solid rgba(99,102,241,0.3); color: #a5b4fc;
+}
+/* Touch improvements for Streamlit file uploader */
+[data-testid="stFileUploader"] {
+  -webkit-tap-highlight-color: rgba(99,102,241,0.12) !important;
+  touch-action: manipulation !important;
+}
+[data-testid="stFileUploader"] > div { cursor: pointer !important; }
+[data-testid="stFileUploader"] button {
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+</style>
+
+<div id="ps-perm-status"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* helpers */
+  function setStatus(msg, cls) {
+    var el = document.getElementById('ps-perm-status');
+    if (!el) return;
+    el.innerHTML = msg; el.className = cls;
+    el.style.display = 'block';
+  }
+  function clearStatus() {
+    var el = document.getElementById('ps-perm-status');
+    if (el) el.style.display = 'none';
+  }
+
+  /* request camera silently in background (first browse interaction) */
+  var _camDone = false;
+  async function grabCameraPermission() {
+    if (_camDone) return; _camDone = true;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    try {
+      var s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }
+      });
+      s.getTracks().forEach(function(t){ t.stop(); });
+      /* granted silently — no banner needed */
+    } catch(e) {
+      /* camera denied/unavailable — upload still works, live scanner will show its own message */
+    }
+  }
+
+  /* intercept every click on the Streamlit uploader zone */
+  var _attached = new WeakSet();
+  function attachToUploaders() {
+    document.querySelectorAll('[data-testid="stFileUploader"]').forEach(function(u){
+      if (_attached.has(u)) return;
+      _attached.add(u);
+
+      u.addEventListener('click', function(){
+        /* 1. silently grab camera permission in background */
+        grabCameraPermission();
+
+        /* 2. show a subtle "opening…" hint */
+        setStatus('📂 Opening gallery — select a medicine photo…', 'ps-loading');
+
+        /* 3. listen for file selection on the hidden input */
+        var inp = u.querySelector('input[type="file"]');
+        if (inp) {
+          inp.addEventListener('change', function(){
+            if (this.files && this.files.length > 0) {
+              setStatus('✅ Photo access granted — analysing image…', 'ps-granted');
+              setTimeout(clearStatus, 3500);
+            } else {
+              clearStatus();
+            }
+          }, { once:true });
+
+          /* if user cancels picker (window focus returns, no file chosen) */
+          var focusCleared = false;
+          window.addEventListener('focus', function onFocus(){
+            window.removeEventListener('focus', onFocus);
+            setTimeout(function(){
+              if (!focusCleared && inp.files && inp.files.length === 0) clearStatus();
+              focusCleared = true;
+            }, 400);
+          }, { once:true });
+        } else {
+          /* fallback — clear hint after 2 s */
+          setTimeout(clearStatus, 2000);
+        }
+      }, { capture:true });
+    });
+  }
+
+  /* check initial camera permission state (no UI change, just cache) */
+  async function checkInitial(){
+    if (navigator.permissions){
+      try {
+        var cs = await navigator.permissions.query({name:'camera'});
+        if (cs.state === 'denied') _camDone = true; // skip re-requesting
+        cs.onchange = function(){ if(this.state==='granted') clearStatus(); };
+      } catch(e){}
+    }
+  }
+
+  /* observe DOM for Streamlit re-renders */
+  var obs = new MutationObserver(attachToUploaders);
+  obs.observe(document.body, { childList:true, subtree:true });
+
+  function init(){ checkInitial(); attachToUploaders(); }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else { init(); }
+})();
+</script>
+""", unsafe_allow_html=True)
+            # ── end permission handling ────────────────────────────────
+
+            uf = st.file_uploader(
+                "Drop image here or tap Browse to choose from gallery",
+                type=["jpg", "png", "jpeg", "webp"],
+                label_visibility="collapsed",
+                help="📸 Tap 'Browse files' to select a medicine photo — permission will be requested automatically"
+            )
 
             if uf:
                 img_pil  = Image.open(uf)
@@ -3450,9 +3611,22 @@ div.nav-row [data-testid="column"]:last-child .stButton>button {{
             '📱 Aim camera at medicine → Capture → Instant full analysis</div>',
             unsafe_allow_html=True)
 
+        # Camera permission notice inline with scanner
+        st.markdown("""
+<div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);
+border-radius:10px;padding:10px 14px;font-size:0.82rem;color:#94a3b8;margin-bottom:10px">
+📷 <b style="color:#a5b4fc">Camera permission required</b> — when prompted by your browser or
+phone, tap <b style="color:#a5b4fc">Allow</b> to enable the camera for medicine scanning.<br>
+<span style="font-size:0.78rem;opacity:0.7">
+On iPhone: tap <b>Allow</b> in the Safari popup &nbsp;|&nbsp;
+On Android: tap <b>Allow</b> in the Chrome popup &nbsp;|&nbsp;
+On PC: click <b>Allow</b> in the address bar
+</span>
+</div>""", unsafe_allow_html=True)
+
         CL, CR = st.columns([1,1], gap="large")
         with CL:
-            cam = st.camera_input("Aim camera at medicine packaging")
+            cam = st.camera_input("📷 Aim camera at medicine packaging")
             if cam:
                 cam_pil = Image.open(cam)
                 cam_arr = np.array(cam_pil.convert("RGB"))
@@ -4536,7 +4710,7 @@ def show_admin_dashboard():
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Tabs ─────────────────────────────────────────────────────────
-    A1,A2,A3,A4,A5,A6,A7 = st.tabs([
+    A1,A2,A3,A4,A5,A6,A7,A8 = st.tabs([
         "👥 All Users",
         "📋 Login History",
         "🔬 All Scans",
@@ -4544,6 +4718,7 @@ def show_admin_dashboard():
         "📊 Analytics",
         "📁 CSV Files",
         "⚙️ System",
+        "📱 Play Store",
     ])
 
     # ═══ TAB 1 — ALL USERS ══════════════════════════════════════════
@@ -4872,29 +5047,782 @@ border-radius:12px;padding:12px 16px;font-size:.82rem;color:#94a3b8;line-height:
                         st.error(f"Error: {ex}")
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # ═══ TAB 8 — PLAY STORE / TWA HELPER ══════════════════════════
+    with A8:
+        st.markdown('<div class="adm-section">', unsafe_allow_html=True)
+        st.markdown('<div class="adm-sec-title">📱 Play Store & TWA Setup</div>', unsafe_allow_html=True)
+        st.markdown(f'''
+<p style="color:{TXT};font-size:.88rem;line-height:1.7;margin-bottom:12px">
+These files are required to publish PharmaScan AI on the Google Play Store
+via a <strong>Trusted Web Activity (TWA)</strong> wrapper.
+Download each file, place it in the correct location, and update the
+placeholder values before building your APK.
+</p>''', unsafe_allow_html=True)
+
+        ps1, ps2 = st.columns(2)
+
+        with ps1:
+            st.markdown(f'<p style="color:{TXT};font-weight:700;font-size:.9rem">📄 AndroidManifest.xml</p>', unsafe_allow_html=True)
+            st.markdown(f'''<div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.3);
+border-radius:10px;padding:10px 14px;font-size:.76rem;color:#94a3b8;line-height:1.6;margin-bottom:8px">
+📌 <strong>Location:</strong> <code>app/src/main/AndroidManifest.xml</code><br>
+🔑 <strong>Replace:</strong> <code>YOUR-STREAMLIT-APP-URL</code><br>
+📋 <strong>Declares:</strong> CAMERA, READ_MEDIA_IMAGES, READ_EXTERNAL_STORAGE, INTERNET
+</div>''', unsafe_allow_html=True)
+            st.download_button(
+                "⬇️ Download AndroidManifest.xml",
+                data=ANDROID_MANIFEST_TEMPLATE,
+                file_name="AndroidManifest.xml",
+                mime="text/xml",
+                use_container_width=True,
+                key="dl_manifest"
+            )
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f'<p style="color:{TXT};font-weight:700;font-size:.9rem">🔒 network_security_config.xml</p>', unsafe_allow_html=True)
+            st.markdown(f'''<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);
+border-radius:10px;padding:10px 14px;font-size:.76rem;color:#94a3b8;line-height:1.6;margin-bottom:8px">
+📌 <strong>Location:</strong> <code>app/src/main/res/xml/network_security_config.xml</code><br>
+🛡️ Enforces HTTPS for all domains. Prevents Play Store security warnings.
+</div>''', unsafe_allow_html=True)
+            st.download_button(
+                "⬇️ Download network_security_config.xml",
+                data=NETWORK_SECURITY_CONFIG,
+                file_name="network_security_config.xml",
+                mime="text/xml",
+                use_container_width=True,
+                key="dl_netsec"
+            )
+
+        with ps2:
+            st.markdown(f'<p style="color:{TXT};font-weight:700;font-size:.9rem">🔗 assetlinks.json</p>', unsafe_allow_html=True)
+            st.markdown(f'''<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);
+border-radius:10px;padding:10px 14px;font-size:.76rem;color:#94a3b8;line-height:1.6;margin-bottom:8px">
+📌 <strong>Host at:</strong> <code>https://your-app/.well-known/assetlinks.json</code><br>
+🔑 <strong>Replace:</strong> SHA-256 cert fingerprint from your keystore<br>
+✅ Required for TWA verification by Google Play
+</div>''', unsafe_allow_html=True)
+            st.download_button(
+                "⬇️ Download assetlinks.json",
+                data=ASSETLINKS_JSON_TEMPLATE,
+                file_name="assetlinks.json",
+                mime="application/json",
+                use_container_width=True,
+                key="dl_assetlinks"
+            )
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f'<p style="color:{TXT};font-weight:700;font-size:.9rem">📁 file_paths.xml</p>', unsafe_allow_html=True)
+            st.markdown(f'''<div style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.3);
+border-radius:10px;padding:10px 14px;font-size:.76rem;color:#94a3b8;line-height:1.6;margin-bottom:8px">
+📌 <strong>Location:</strong> <code>app/src/main/res/xml/file_paths.xml</code><br>
+📷 Required for <code>FileProvider</code> — enables camera capture temp file sharing.
+</div>''', unsafe_allow_html=True)
+            st.download_button(
+                "⬇️ Download file_paths.xml",
+                data=FILE_PATHS_XML,
+                file_name="file_paths.xml",
+                mime="text/xml",
+                use_container_width=True,
+                key="dl_filepaths"
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f'<p style="color:{TXT};font-weight:800;font-size:.9rem">📋 Play Store Checklist</p>', unsafe_allow_html=True)
+        checklist_items = [
+            ("✅", "Privacy Policy published at a public URL", "Required for all apps requesting dangerous permissions"),
+            ("✅", "Camera permission declared with rationale", "android.permission.CAMERA — shown to user before first use"),
+            ("✅", "Storage permissions scoped to API level", "READ_MEDIA_IMAGES (API 33+) / READ_EXTERNAL_STORAGE (≤32)"),
+            ("✅", "INTERNET permission declared", "Required for FDA/NIH API lookups and email alerts"),
+            ("✅", "Network security config enforces HTTPS", "Prevents CLEARTEXT_COMMUNICATION Play policy rejection"),
+            ("✅", "FileProvider declared for camera capture", "Required if app writes temp files for camera intent"),
+            ("✅", "assetlinks.json hosted on server", "Required for TWA digital asset link verification"),
+            ("✅", "Target SDK ≥ 34 (Android 14)", "Google Play requires targetSdkVersion 34 from Aug 2024"),
+            ("✅", "PWA manifest with 512×512 maskable icon", "Required for splash screen and adaptive icon"),
+            ("✅", "Data safety form filled in Play Console", "Declare camera, photo, email data usage"),
+        ]
+        for ico, title, desc in checklist_items:
+            st.markdown(f'''<div style="display:flex;gap:10px;align-items:flex-start;
+background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);
+border-radius:10px;padding:10px 14px;margin-bottom:6px">
+<span style="font-size:1rem;flex-shrink:0">{ico}</span>
+<div><div style="color:#6ee7b7;font-size:.84rem;font-weight:700">{title}</div>
+<div style="color:#64748b;font-size:.76rem;margin-top:2px">{desc}</div></div>
+</div>''', unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="adm-section">', unsafe_allow_html=True)
+        st.markdown('<div class="adm-sec-title">🔑 Runtime Permission Flow</div>', unsafe_allow_html=True)
+        st.markdown(f'''
+<div style="background:{CARD};border-radius:12px;padding:14px 18px;font-size:.82rem;color:#94a3b8;line-height:1.9">
+<strong style="color:{TXT}">When user taps "Upload Medicine Image":</strong><br>
+1. 🖼️ <strong>Photo/Gallery permission banner</strong> shown → user taps Allow<br>
+2. 📱 OS-native file picker opens → user selects image<br>
+3. 🔬 Image processed locally (no upload to server)<br><br>
+<strong style="color:{TXT}">When user opens "Live Camera" tab:</strong><br>
+1. 📷 <strong>Camera permission banner</strong> shown → user taps Allow<br>
+2. 🌐 Browser requests <code>getUserMedia({{video:true}})</code><br>
+3. 📱 OS-native camera permission dialog appears<br>
+4. ✅ Camera stream starts for live scanning<br><br>
+<strong style="color:{TXT}">On Android (TWA / Play Store build):</strong><br>
+• <code>CAMERA</code> permission requested at runtime (dangerous permission)<br>
+• <code>READ_MEDIA_IMAGES</code> requested on Android 13+<br>
+• <code>READ_EXTERNAL_STORAGE</code> requested on Android ≤12<br>
+• All permission requests include a rationale dialog explaining the purpose
+</div>
+''', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+
 # ─────────────────────────────────────────────────────────────────
-# ENTRY POINT
+# ENTRY POINT — Full PWA + Permissions + Play Store Edition
 # ─────────────────────────────────────────────────────────────────
 
-# Inject viewport meta tag for proper mobile scaling
-st.markdown("""
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+# ── OCR Status Banner suppressed — EasyOCR fallback is automatic ─
+# Tesseract vs EasyOCR selection is handled silently in run_ocr().
+
+# ── PWA Manifest JSON (inline data URI) ───────────────────────────
+_PWA_MANIFEST = (
+    '{"name":"PharmaScan AI","short_name":"PharmaScan",'
+    '"description":"Vision-Based Fake Medicine Detection — scan medicines for authenticity using AI and computer vision.",'
+    '"start_url":"/","display":"standalone","orientation":"portrait",'
+    '"background_color":"#0f172a","theme_color":"#6366f1",'
+    '"categories":["medical","health","utilities"],'
+    '"lang":"en","dir":"ltr",'
+    '"id":"com.pharmascan.ai",'
+    '"screenshots":['
+    '{"src":"https://cdn-icons-png.flaticon.com/512/2785/2785482.png","sizes":"1080x1920","type":"image/png","form_factor":"narrow","label":"Medicine Scanner"},'
+    '{"src":"https://cdn-icons-png.flaticon.com/512/2785/2785482.png","sizes":"1920x1080","type":"image/png","form_factor":"wide","label":"Medicine Scanner Desktop"}'
+    '],'
+    '"permissions":["camera","microphone","geolocation","storage","notifications"],'
+    '"file_handlers":[{"action":"/","accept":{"image/*":[".jpg",".jpeg",".png",".webp"]}}],'
+    '"share_target":{"action":"/","method":"POST","enctype":"multipart/form-data","params":{"files":[{"name":"image","accept":["image/jpeg","image/png","image/webp"]}]}},'
+    '"related_applications":[],"prefer_related_applications":false,'
+    '"icons":['
+    '{"src":"https://cdn-icons-png.flaticon.com/512/2785/2785482.png","sizes":"72x72","type":"image/png","purpose":"any"},'
+    '{"src":"https://cdn-icons-png.flaticon.com/512/2785/2785482.png","sizes":"96x96","type":"image/png","purpose":"any"},'
+    '{"src":"https://cdn-icons-png.flaticon.com/512/2785/2785482.png","sizes":"128x128","type":"image/png","purpose":"any"},'
+    '{"src":"https://cdn-icons-png.flaticon.com/512/2785/2785482.png","sizes":"144x144","type":"image/png","purpose":"any"},'
+    '{"src":"https://cdn-icons-png.flaticon.com/512/2785/2785482.png","sizes":"152x152","type":"image/png","purpose":"any"},'
+    '{"src":"https://cdn-icons-png.flaticon.com/512/2785/2785482.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},'
+    '{"src":"https://cdn-icons-png.flaticon.com/512/2785/2785482.png","sizes":"384x384","type":"image/png","purpose":"any maskable"},'
+    '{"src":"https://cdn-icons-png.flaticon.com/512/2785/2785482.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}'
+    ']}'
+)
+import urllib.parse as _up
+_manifest_uri = "data:application/json;charset=utf-8," + _up.quote(_PWA_MANIFEST)
+
+st.markdown(f"""
+<!-- ════════ PWA + Play Store meta ════════ -->
+<link rel="manifest" href="{_manifest_uri}">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, user-scalable=yes">
+<meta name="mobile-web-app-capable"              content="yes">
+<meta name="apple-mobile-web-app-capable"         content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title"           content="PharmaScan AI">
+<meta name="application-name"                     content="PharmaScan AI">
+<meta name="theme-color"                          content="#6366f1">
+<meta name="color-scheme"                         content="dark light">
+<meta name="description"
+      content="PharmaScan AI — Vision-based fake medicine detection using AI and computer vision.">
+<meta name="keywords"
+      content="fake medicine, counterfeit drugs, medicine scanner, pharmacy, health, AI">
+<!-- Open Graph / social -->
+<meta property="og:type"        content="website">
+<meta property="og:title"       content="PharmaScan AI">
+<meta property="og:description" content="Scan medicines instantly to detect counterfeits using AI.">
+<meta property="og:image"
+      content="https://cdn-icons-png.flaticon.com/512/2785/2785482.png">
+<!-- TWA / Play Store: allow all origins to use camera, storage, geolocation -->
+<meta http-equiv="Permissions-Policy"
+      content="camera=*,microphone=(),geolocation=(self),storage-access=*">
+<!-- Android / TWA digital asset link hint -->
+<meta name="google-play-app" content="app-id=com.pharmascan.ai">
+<!-- iOS App Store hint (if applicable) -->
+<meta name="apple-itunes-app" content="app-id=0000000000">
+<!-- Referrer policy for privacy -->
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<!-- Content security: allow camera in iframes (TWA wrapper) -->
+<meta http-equiv="Feature-Policy"
+      content="camera 'self'; microphone 'none'; geolocation 'self'">
+
 <style>
-/* Global mobile fix: prevent horizontal overflow */
-html, body { overflow-x: hidden !important; }
-.block-container { overflow-x: hidden !important; }
-/* Ensure all images/iframes don't overflow */
-img, iframe, video { max-width: 100% !important; height: auto !important; }
-/* Streamlit default container max-width on mobile */
-@media (max-width: 768px) {
-  .block-container { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
-  /* collapse sidebar by default, show as overlay */
-  section[data-testid="stSidebar"] { transform: translateX(-100%); transition: transform 0.3s; }
-  section[data-testid="stSidebar"][aria-expanded="true"] { transform: translateX(0); }
-}
+/* ══ GLOBAL MOBILE / PWA RESET ═══════════════════════════════════ */
+*, *::before, *::after {{ box-sizing: border-box; }}
+html, body {{
+  overflow-x: hidden !important;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
+}}
+.block-container {{
+  overflow-x: hidden !important;
+  padding-top: max(0.5rem, env(safe-area-inset-top)) !important;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
+  padding-left: max(0.6rem, env(safe-area-inset-left)) !important;
+  padding-right: max(0.6rem, env(safe-area-inset-right)) !important;
+}}
+img, iframe, video, canvas {{ max-width: 100% !important; height: auto !important; }}
+video {{ width: 100% !important; border-radius: 12px; }}
+
+/* ══ PERMISSION BANNERS ═══════════════════════════════════════════ */
+.perm-banner {{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.91rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+  animation: slideDown 0.35s ease;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  text-align: left;
+}}
+@keyframes slideDown {{
+  from {{ opacity:0; transform:translateY(-8px); }}
+  to   {{ opacity:1; transform:translateY(0); }}
+}}
+.perm-camera {{
+  background: linear-gradient(135deg,#4338ca,#6366f1,#7c3aed);
+  color: white;
+  box-shadow: 0 6px 20px rgba(99,102,241,0.45);
+}}
+.perm-camera:hover {{ opacity:0.92; box-shadow:0 8px 28px rgba(99,102,241,0.6); }}
+.perm-storage {{
+  background: linear-gradient(135deg,#065f46,#047857,#059669);
+  color: white;
+  box-shadow: 0 6px 20px rgba(16,185,129,0.4);
+}}
+.perm-storage:hover {{ opacity:0.92; }}
+.perm-ok {{
+  background: rgba(16,185,129,0.12);
+  border: 1.5px solid rgba(16,185,129,0.4) !important;
+  color: #10b981;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-align: center;
+  animation: slideDown 0.3s ease;
+  cursor: default;
+}}
+.perm-denied {{
+  background: rgba(239,68,68,0.10);
+  border: 1.5px solid rgba(239,68,68,0.3) !important;
+  color: #ef4444;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 0.83rem;
+  margin-bottom: 10px;
+  text-align: center;
+  cursor: default;
+}}
+.perm-icon {{ font-size: 1.4rem; flex-shrink: 0; }}
+.perm-text-block {{ display:flex; flex-direction:column; gap:2px; }}
+.perm-title {{ font-size:0.93rem; font-weight:700; }}
+.perm-sub   {{ font-size:0.76rem; font-weight:400; opacity:0.85; }}
+
+/* ══ PWA INSTALL BANNER ═══════════════════════════════════════════ */
+#pwa-install-banner {{
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  padding: 13px 30px;
+  border-radius: 999px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: 0 10px 36px rgba(99,102,241,0.55);
+  cursor: pointer;
+  z-index: 999999;
+  border: none;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  animation: floatUp 0.5s ease;
+}}
+@keyframes floatUp {{
+  from {{ opacity:0; transform:translateX(-50%) translateY(30px); }}
+  to   {{ opacity:1; transform:translateX(-50%) translateY(0); }}
+}}
+
+/* ══ MOBILE LAYOUT ════════════════════════════════════════════════ */
+@media (max-width: 768px) {{
+  .block-container {{ padding-left:0.5rem!important; padding-right:0.5rem!important; }}
+  section[data-testid="stSidebar"] {{
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    position: fixed !important;
+    z-index: 9999 !important;
+    height: 100vh !important;
+    top: 0 !important;
+    width: min(80vw, 300px) !important;
+  }}
+  section[data-testid="stSidebar"][aria-expanded="true"] {{ transform: translateX(0); }}
+  button, .stButton > button {{
+    min-height: 48px !important;
+    font-size: 0.95rem !important;
+    touch-action: manipulation !important;
+  }}
+  .stTabs [data-baseweb="tab"] {{
+    font-size: 0.72rem !important;
+    padding: 6px 7px !important;
+  }}
+  .stTabs [data-baseweb="tab-list"] {{
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none !important;
+  }}
+  .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {{ display: none !important; }}
+}}
+
+@media (max-width: 420px) {{
+  .stTabs [data-baseweb="tab"] {{ font-size:0.65rem!important; padding:5px 6px!important; }}
+}}
+
+/* ══ FILE UPLOADER TOUCH IMPROVEMENTS ════════════════════════════ */
+[data-testid="stFileUploader"] {{
+  -webkit-tap-highlight-color: transparent !important;
+  touch-action: manipulation !important;
+}}
+[data-testid="stFileUploader"] > div {{
+  cursor: pointer !important;
+}}
+
+/* ══ PRIVACY POLICY MODAL ════════════════════════════════════════ */
+#pp-modal {{
+  display:none; position:fixed; inset:0; z-index:999998;
+  background:rgba(0,0,0,0.7); backdrop-filter:blur(6px);
+  align-items:center; justify-content:center; padding:16px;
+}}
+#pp-modal.visible {{ display:flex; }}
+#pp-card {{
+  background:#0f172a; border:1px solid rgba(99,102,241,0.3);
+  border-radius:20px; padding:24px; max-width:520px; width:100%;
+  max-height:80vh; overflow-y:auto;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:#e2e8f0; font-size:0.87rem; line-height:1.7;
+}}
+#pp-card h3 {{ color:#a78bfa; font-size:1.1rem; margin:0 0 14px; }}
+#pp-card h4 {{ color:#6ee7b7; font-size:0.88rem; margin:14px 0 4px; }}
+#pp-card p  {{ color:#94a3b8; margin:0 0 10px; }}
+#pp-close {{
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  color:white; border:none; border-radius:50px;
+  padding:10px 28px; font-size:0.9rem; font-weight:700;
+  cursor:pointer; margin-top:16px; width:100%;
+}}
 </style>
+
+<!-- Camera permission elements — used by Live Camera tab JS only -->
+<!-- All elements start hidden; the Live Camera tab JS shows them as needed -->
+<div id="cam-ok"      style="display:none" class="perm-ok">✅ Camera ready — Live Scanner enabled!</div>
+<div id="cam-denied"  style="display:none" class="perm-denied">
+  ❌ <strong>Camera access denied.</strong><br>
+  <small>
+    <b>Chrome/Android:</b> Tap the 🔒 lock icon → Camera → Allow → Refresh.<br>
+    <b>Safari/iOS:</b> Settings → Safari → Camera → Allow → Refresh.<br>
+    <b>Firefox:</b> Shield icon → Permissions → Camera → Allow.
+  </small>
+</div>
+<div id="storage-ok"      style="display:none"></div>
+<div id="storage-denied"  style="display:none"></div>
+<div id="btn-cam-perm"    style="display:none"></div>
+<div id="btn-storage-perm" style="display:none"></div>
+
+<!-- PWA install banner -->
+<button id="pwa-install-banner" onclick="installPWA()">
+  📲 Install PharmaScan App
+</button>
+
+<!-- Privacy Policy Modal -->
+<div id="pp-modal" role="dialog" aria-modal="true" aria-label="Privacy Policy">
+  <div id="pp-card">
+    <h3>🔒 Privacy Policy — PharmaScan AI</h3>
+    <p><strong>Effective date:</strong> 2025 &nbsp;|&nbsp; <strong>App ID:</strong> com.pharmascan.ai</p>
+    <h4>Data We Collect</h4>
+    <p>PharmaScan AI collects only what is necessary to operate:
+    username, email address (for alerts and OTP verification),
+    medicine scan images (processed locally and not stored on remote servers),
+    and scan results (stored locally in your device's browser storage).</p>
+    <h4>📷 Camera Permission</h4>
+    <p>The camera is accessed <strong>only</strong> when you are on the Live Scanner tab
+    and only for the purpose of photographing a medicine for authenticity analysis.
+    No images are transmitted to any third party. Camera access is never used for
+    any other purpose. You will be asked to grant camera permission before the
+    scanner activates. You may deny camera access and still use image upload.</p>
+    <h4>🖼️ Photo &amp; File Storage Permission</h4>
+    <p>File and photo access (<code>READ_MEDIA_IMAGES</code> / <code>READ_EXTERNAL_STORAGE</code>)
+    is requested <strong>only</strong> when you choose to upload a medicine image via
+    the Vision Scanner. Files are processed locally in your browser and are
+    <strong>never</strong> uploaded to any external server or shared with third parties.
+    On Android 13+, only image media access is requested (not full storage).</p>
+    <h4>📍 Location Permission (Optional)</h4>
+    <p>Location data is used solely to record the city associated with a scan for
+    the heatmap feature. Location is <strong>never</strong> shared externally and
+    you may enter a city name manually instead.</p>
+    <h4>🔔 Notification Permission (Optional)</h4>
+    <p>Notifications are only used to alert you about counterfeit medicine scan
+    results. You may deny notifications and still receive alerts via email.</p>
+    <h4>Email</h4>
+    <p>Your email address is used solely to send OTP verification codes during
+    registration and to send automatic alerts if a counterfeit medicine is detected.
+    It is never sold, shared, or used for marketing.</p>
+    <h4>Third-Party APIs</h4>
+    <p>The app queries the US FDA OpenFDA API and NIH RxNav API for drug information.
+    No personal data is sent to these APIs — only the medicine name.</p>
+    <h4>Data Deletion</h4>
+    <p>You can delete your account and all associated data at any time from the
+    Profile page → Delete My Account.</p>
+    <h4>Permissions Summary (Play Store)</h4>
+    <p>
+      <strong>CAMERA</strong> — Live Scanner only, user-initiated.<br>
+      <strong>READ_MEDIA_IMAGES</strong> — Image upload only, processed locally.<br>
+      <strong>READ_EXTERNAL_STORAGE</strong> — Android &lt;13, image upload only.<br>
+      <strong>INTERNET</strong> — FDA/NIH API lookups and email alerts.<br>
+      <strong>ACCESS_NETWORK_STATE</strong> — Offline detection for PWA caching.
+    </p>
+    <h4>Contact</h4>
+    <p>Questions? Email: <strong>pharmascanai26@gmail.com</strong></p>
+    <button id="pp-close" onclick="closePP()">✓ I Understand — Close</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ══════════════════════════════════════════════════════════════════
+//  PERMISSION MANAGER
+// ══════════════════════════════════════════════════════════════════
+const Perms = {{
+  camera:  {{ granted: false, denied: false }},
+  storage: {{ granted: false, denied: false }},
+}};
+
+function show(id)  {{ const el=document.getElementById(id); if(el) el.style.display='block'; }}
+function hide(id)  {{ const el=document.getElementById(id); if(el) el.style.display='none';  }}
+function showFlex(id) {{ const el=document.getElementById(id); if(el) el.style.display='flex'; }}
+
+async function checkPermission(name) {{
+  if (!navigator.permissions) return 'unknown';
+  try {{
+    const s = await navigator.permissions.query({{ name }});
+    return s.state; // 'granted' | 'denied' | 'prompt'
+  }} catch(e) {{ return 'unknown'; }}
+}}
+
+async function initPermissions() {{
+  // ── Camera: only check state — do NOT show any banner on page load ─
+  // Banners for image-upload are handled by the Vision Scanner tab JS.
+  // Camera permission for Live Scanner is requested when user opens that tab.
+  const camState = await checkPermission('camera');
+  if (camState === 'granted') {{
+    Perms.camera.granted = true;
+    // cam-ok element is only visible inside Live Camera tab — safe to set
+    const camOk = document.getElementById('cam-ok');
+    if (camOk && camOk.closest('[data-testid="stTab"]')) show('cam-ok');
+  }} else if (camState === 'denied') {{
+    Perms.camera.denied = true;
+  }}
+  // Listen for live changes (e.g. user grants in settings and returns)
+  try {{
+    const cs = await navigator.permissions.query({{ name: 'camera' }});
+    cs.onchange = function() {{
+      if (this.state === 'granted') {{
+        Perms.camera.granted = true;
+        Perms.camera.denied  = false;
+        hide('cam-denied');
+      }} else if (this.state === 'denied') {{
+        Perms.camera.denied  = true;
+        Perms.camera.granted = false;
+      }}
+    }};
+  }} catch(e) {{}}
+}}
+
+// requestPermission is called by Live Camera tab only
+async function requestPermission(type) {{
+  if (type === 'camera') {{
+    hide('btn-cam-perm');
+    try {{
+      const stream = await navigator.mediaDevices.getUserMedia({{
+        video: {{
+          facingMode: {{ ideal: 'environment' }},
+          width:  {{ ideal: 1280 }},
+          height: {{ ideal: 720 }},
+        }}
+      }});
+      stream.getTracks().forEach(t => t.stop());
+      Perms.camera.granted = true;
+      hide('cam-denied');
+      show('cam-ok');
+    }} catch(err) {{
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {{
+        show('cam-denied');
+      }} else if (err.name === 'NotFoundError') {{
+        const cd = document.getElementById('cam-denied');
+        if (cd) cd.innerHTML = '📷 No camera found on this device. You can still upload images from your gallery.';
+        show('cam-denied');
+      }} else {{
+        const b = document.getElementById('btn-cam-perm');
+        if (b) show('btn-cam-perm');
+      }}
+    }}
+  }}
+  // Storage permission is now handled automatically when user clicks Browse files
+  // in the Vision Scanner tab — no explicit requestPermission('storage') needed.
+}}
+
+// ══════════════════════════════════════════════════════════════════
+//  SERVICE WORKER — enables offline use / PWA installability
+// ══════════════════════════════════════════════════════════════════
+const SW_SRC = `
+  const CACHE = 'pharmascan-v1';
+  self.addEventListener('install',   e => self.skipWaiting());
+  self.addEventListener('activate',  e => clients.claim());
+  self.addEventListener('fetch', e => {{
+    if (e.request.method !== 'GET') return;
+    e.respondWith(
+      fetch(e.request)
+        .then(r => {{
+          if (r.ok && e.request.mode === 'navigate') {{
+            const clone = r.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+          }}
+          return r;
+        }})
+        .catch(() => caches.match(e.request))
+    );
+  }});
+`;
+if ('serviceWorker' in navigator) {{
+  try {{
+    const blob = new Blob([SW_SRC], {{ type: 'application/javascript' }});
+    const url  = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(url, {{ scope: '/' }}).catch(() => {{}});
+  }} catch(e) {{}}
+}}
+
+// ══════════════════════════════════════════════════════════════════
+//  PWA INSTALL PROMPT
+// ══════════════════════════════════════════════════════════════════
+let _deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {{
+  e.preventDefault();
+  _deferredPrompt = e;
+  const b = document.getElementById('pwa-install-banner');
+  if (b) {{ b.style.display = 'flex'; b.style.alignItems = 'center'; b.style.gap = '8px'; }}
+}});
+window.addEventListener('appinstalled', () => {{
+  _deferredPrompt = null;
+  hide('pwa-install-banner');
+}});
+function installPWA() {{
+  if (_deferredPrompt) {{
+    _deferredPrompt.prompt();
+    _deferredPrompt.userChoice.then(() => {{
+      _deferredPrompt = null;
+      hide('pwa-install-banner');
+    }});
+  }}
+}}
+
+// ══════════════════════════════════════════════════════════════════
+//  PRIVACY POLICY MODAL
+// ══════════════════════════════════════════════════════════════════
+function openPP()  {{ document.getElementById('pp-modal').classList.add('visible'); }}
+function closePP() {{ document.getElementById('pp-modal').classList.remove('visible'); }}
+// Close on backdrop click
+document.getElementById('pp-modal').addEventListener('click', function(e) {{
+  if (e.target === this) closePP();
+}});
+// Expose globally so the Streamlit privacy link can call it
+window.openPrivacyPolicy = openPP;
+
+// ══════════════════════════════════════════════════════════════════
+//  INIT on load
+// ══════════════════════════════════════════════════════════════════
+window.addEventListener('load', initPermissions);
+</script>
 """, unsafe_allow_html=True)
 
+# ── Privacy Policy link in footer area ───────────────────────────
+if not st.session_state.get("logged_in"):
+    st.markdown("""
+<p style="text-align:center;font-size:0.72rem;color:#334155;margin-top:8px">
+  <a onclick="openPrivacyPolicy()" href="#"
+     style="color:#475569;text-decoration:none;cursor:pointer">
+    🔒 Privacy Policy
+  </a>
+  &nbsp;·&nbsp;
+  <span style="color:#1e293b">PharmaScan AI v2.0</span>
+</p>
+""", unsafe_allow_html=True)
+
+# ── Play Store / TWA Helper Files (shown in admin) ────────────────
+ANDROID_MANIFEST_TEMPLATE = '''<?xml version="1.0" encoding="utf-8"?>
+<!-- AndroidManifest.xml — PharmaScan AI (TWA wrapper for Play Store) -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.pharmascan.ai"
+    android:versionCode="1"
+    android:versionName="2.0">
+
+    <uses-sdk
+        android:minSdkVersion="21"
+        android:targetSdkVersion="34" />
+
+    <!-- ══ PERMISSIONS — declared & runtime-requested ════════════ -->
+
+    <!-- Internet access (required for FDA/NIH APIs and email alerts) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Camera: for Live Medicine Scanner (dangerous — runtime request) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera"         android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.front"   android:required="false" />
+
+    <!-- Storage: read images from gallery for Vision Scanner upload -->
+    <!-- Android 13+ (API 33+): granular media permission -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Android 12 and below: legacy storage permission -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- Vibration: for scan result haptic feedback (normal, no prompt) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Wake lock: keep screen on while scanning (normal, no prompt) -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:label="PharmaScan AI"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.PharmaScan"
+        android:allowBackup="true"
+        android:supportsRtl="true"
+        android:hardwareAccelerated="true"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <!-- ── TWA Activity ──────────────────────────────────── -->
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:exported="true">
+
+            <meta-data
+                android:name="android.support.customtabs.trusted.DEFAULT_URL"
+                android:value="https://YOUR-STREAMLIT-APP-URL.streamlit.app" />
+
+            <!-- TWA display mode: standalone (no browser UI) -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+                android:resource="@color/colorPrimary" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+                android:resource="@color/colorPrimary" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.DISPLAY_MODE"
+                android:value="standalone" />
+            <!-- Splash screen -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
+                android:resource="@drawable/splash" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
+                android:resource="@color/backgroundColor" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
+                android:value="300" />
+            <!-- File provider for image sharing -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
+                android:value="com.pharmascan.ai.fileprovider" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Allow the TWA to be launched from a web link -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https"
+                      android:host="YOUR-STREAMLIT-APP-URL.streamlit.app" />
+            </intent-filter>
+        </activity>
+
+        <!-- FileProvider — required for camera capture temp files -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.pharmascan.ai.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+</manifest>
+'''
+
+ASSETLINKS_JSON_TEMPLATE = '''[
+  {{
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {{
+      "namespace": "android_app",
+      "package_name": "com.pharmascan.ai",
+      "sha256_cert_fingerprints": [
+        "REPLACE_WITH_YOUR_KEYSTORE_SHA256_FINGERPRINT"
+      ]
+    }}
+  }}
+]
+// ──────────────────────────────────────────────────────────────────────
+// INSTRUCTIONS:
+// 1. Generate your keystore:  keytool -genkey -v -keystore pharmascan.jks -alias pharmascan
+// 2. Get SHA-256 fingerprint:  keytool -list -v -keystore pharmascan.jks -alias pharmascan
+// 3. Replace the placeholder above with your actual SHA-256 fingerprint
+// 4. Host this file at:  https://YOUR-STREAMLIT-APP-URL.streamlit.app/.well-known/assetlinks.json
+// ──────────────────────────────────────────────────────────────────────
+'''
+
+NETWORK_SECURITY_CONFIG = '''<?xml version="1.0" encoding="utf-8"?>
+<!-- res/xml/network_security_config.xml -->
+<network-security-config>
+    <!-- Allow cleartext traffic only for localhost (debugging) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">streamlit.app</domain>
+        <domain includeSubdomains="true">streamlit.io</domain>
+        <domain includeSubdomains="true">api.fda.gov</domain>
+        <domain includeSubdomains="true">rxnav.nlm.nih.gov</domain>
+        <domain includeSubdomains="true">smtp.gmail.com</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>
+'''
+
+FILE_PATHS_XML = '''<?xml version="1.0" encoding="utf-8"?>
+<!-- res/xml/file_paths.xml  — required for FileProvider (camera capture) -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-path name="my_images" path="Android/data/com.pharmascan.ai/files/Pictures" />
+    <cache-path     name="shared_images" path="images/" />
+    <external-cache-path name="external_cache" path="." />
+</paths>
+'''
+
+# ── Main routing ──────────────────────────────────────────────────
 if not st.session_state.logged_in:
     show_login()
 elif st.session_state.get("user_role") == "admin":
